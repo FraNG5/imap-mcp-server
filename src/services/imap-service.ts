@@ -188,7 +188,12 @@ export class ImapService {
       // an IP host it also omits the SNI servername, so Node would otherwise
       // check the cert against a default of "localhost" and reject a cert
       // bound to e.g. 127.0.0.1 (local bridges like ProtonMail Bridge).
-      tls: { host: account.host },
+      tls: {
+        host: account.host,
+        rejectUnauthorized: account.tlsRejectUnauthorized !== undefined 
+          ? account.tlsRejectUnauthorized 
+          : true,
+      },
       auth: {
         user: account.user,
         pass: account.password,
@@ -1589,7 +1594,12 @@ export class ImapService {
       port: account.port,
       secure: account.tls,
       // Validate the certificate against the host we actually dial; see connect().
-      tls: { host: account.host },
+      tls: {
+        host: account.host,
+        rejectUnauthorized: account.tlsRejectUnauthorized !== undefined 
+          ? account.tlsRejectUnauthorized 
+          : true,
+      },
       auth: {
         user: account.user,
         pass: account.password,

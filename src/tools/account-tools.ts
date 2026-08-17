@@ -20,6 +20,7 @@ export function accountTools(
       user: z.string().describe('Username for authentication'),
       password: z.string().describe('Password for authentication'),
       tls: z.boolean().default(true).describe('Use TLS/SSL (default: true)'),
+      tlsRejectUnauthorized: z.boolean().optional().default(true).describe('Reject unauthorized TLS certificates (self-signed, expired, etc.). Set to false to allow connections to servers with invalid certificates. Default: true'),
       email: z.string().optional().describe('Email address (From: header). Defaults to user if omitted'),
       smtpHost: z.string().optional().describe('SMTP server hostname. Defaults to IMAP host with imap.→smtp. rewrite'),
       smtpPort: z.coerce.number().optional().describe('SMTP server port (465 for SMTPS, 587 for STARTTLS). Defaults to 587'),
@@ -27,7 +28,7 @@ export function accountTools(
       sentFolder: z.string().optional().describe('Explicit Sent-folder name for saving sent-mail copies (e.g. "Gesendet"). Only needed when auto-detection fails — the server must lack a \\Sent SPECIAL-USE folder. Check names with imap_list_folders'),
       defaultBcc: z.union([z.string(), z.array(z.string())]).optional().describe('Optional BCC address(es) applied automatically to every outbound send, reply, forward, and draft for this account. Merged with any per-call bcc'),
     }
-  }, async ({ name, host, port, user, password, tls, email, smtpHost, smtpPort, smtpSecure, sentFolder, defaultBcc }) => {
+  }, async ({ name, host, port, user, password, tls, tlsRejectUnauthorized, email, smtpHost, smtpPort, smtpSecure, sentFolder, defaultBcc }) => {
     const smtp = (smtpHost || smtpPort !== undefined || smtpSecure !== undefined)
       ? {
           host: smtpHost || host,
@@ -43,6 +44,7 @@ export function accountTools(
       user,
       password,
       tls,
+      ...(tlsRejectUnauthorized !== undefined ? { tlsRejectUnauthorized } : {}),
       ...(email ? { email } : {}),
       ...(smtp ? { smtp } : {}),
       ...(sentFolder ? { sentFolder } : {}),
@@ -74,6 +76,7 @@ export function accountTools(
       user: z.string().optional().describe('IMAP username'),
       password: z.string().optional().describe('New password'),
       tls: z.boolean().optional().describe('Use TLS for IMAP'),
+      tlsRejectUnauthorized: z.boolean().optional().describe('Reject unauthorized TLS certificates (self-signed, expired, etc.). Set to false to allow connections to servers with invalid certificates'),
       email: z.string().optional().describe('Email address (From: header)'),
       smtpHost: z.string().optional().describe('SMTP hostname'),
       smtpPort: z.coerce.number().optional().describe('SMTP port (465 for SMTPS, 587 for STARTTLS)'),
@@ -84,7 +87,7 @@ export function accountTools(
       sentFolder: z.string().optional().describe('Explicit Sent-folder name for saving sent-mail copies (e.g. "Gesendet"). Overrides auto-detection; pass an empty string to clear the override and re-enable auto-detection. Check names with imap_list_folders'),
       defaultBcc: z.union([z.string(), z.array(z.string())]).optional().describe('Optional BCC address(es) applied automatically to every outbound message for this account. Pass an empty string to clear'),
     }
-  }, async ({ accountId, name, host, port, user, password, tls, email, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPassword, saveToSent, sentFolder, defaultBcc }) => {
+  }, async ({ accountId, name, host, port, user, password, tls, tlsRejectUnauthorized, email, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPassword, saveToSent, sentFolder, defaultBcc }) => {
     const existing = accountManager.getAccount(accountId);
     if (!existing) {
       throw new Error(`Account ${accountId} not found`);
@@ -97,6 +100,7 @@ export function accountTools(
     if (user !== undefined) updates.user = user;
     if (password !== undefined) updates.password = password;
     if (tls !== undefined) updates.tls = tls;
+    if (tlsRejectUnauthorized !== undefined) updates.tlsRejectUnauthorized = tlsRejectUnauthorized;
     if (email !== undefined) updates.email = email;
     if (saveToSent !== undefined) updates.saveToSent = saveToSent;
     // Empty string clears the override (falls back to auto-detection).
