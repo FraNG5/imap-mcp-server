@@ -305,7 +305,7 @@ The read-only subset is: `imap_list_accounts`, `imap_connect`, `imap_disconnect`
 `imap_get_latest_emails`, `imap_download_attachment`, `imap_find_thread_messages`,
 `imap_find_email_by_message_id`, `imap_list_folders`, `imap_folder_status`,
 `imap_get_unread_count`, `imap_check_spam`, `imap_domain_stats`,
-`imap_list_spam_domains`.
+`imap_list_spam_domains`, `imap_list_categories`, `imap_categorize_emails`.
 
 ## Usage
 
@@ -632,6 +632,144 @@ Once configured, the IMAP MCP server provides the following tools in Claude:
   - accountId: Account ID
   - folders: Specific folders (optional)
   ```
+
+### Categorization and Auto-Filing
+
+Classifies messages into categories (Finanzen, Shopping, Newsletter, Konto &
+Sicherheit, Gesundheit, Dev/IT, Reisen, …) and optionally files them into
+per-category folders.
+
+Classification is **deterministic** — sender domain, sender mailbox name, subject
+keywords, and mailing-list headers, no model call and no network lookup — so the
+same mailbox always produces the same result, and a dry run is a trustworthy
+preview of what the move will do.
+
+Scoring, against a default threshold of 6:
+
+| Signal | Score |
+|---|---|
+| Sender domain, or a `List-Unsubscribe`/`List-Id` header | 10 |
+| Strong subject keyword — wording that names the message type (`Rechnung`, `Sicherheitswarnung`, `Bestellbestätigung`) | 6 |
+| Sender mailbox name (`rechnung@`, `versand@`) | 5 |
+| Subject keyword | 3 |
+
+So a domain hit classifies, as does a strong keyword; a mailbox name needs one
+keyword alongside it, and a weak keyword needs a second signal. The two keyword
+tiers exist because strength is a property of the word, not the category: a
+subject saying "Ihre Rechnung" is an invoice, while "Whisky Seminar" merely
+mentions a seminar and must not be filed as education.
+
+Ties break by score, then category priority, then category id — never by rule
+order. Domains match on host boundaries (`amazon.de` also matches
+`mail.amazon.de`, never `notamazon.de`) and keywords at word starts, allowing
+German compounds ("rechnung" matches "Rechnungsnummer", but "post" does not match
+"Kompost").
+
+Every decision is reported with its reasons (`domain:amazon.de`,
+`subject!:rechnung` for a strong keyword, `sender:rechnung`, `subject:zahlung`,
+`header:list-unsubscribe`), so a dry run can be reviewed rather than trusted.
+
+**Your own categories.** The built-in rules cover services any mailbox owner
+might hear from. Everything past that — the shop you buy from, the club you
+support, the hobby you collect — is personal, and a rule set that encodes it is
+a profile of its owner. Put those in `~/.imap-mcp/categories.json`; they are
+merged at startup and never travel with the source:
+
+```json
+{
+  "rules": [
+    {
+      "id": "shopping",
+      "domains": ["my-favourite-shop.de"]
+    },
+    {
+      "id": "club",
+      "label": "⚽ Verein",
+      "folder": "Verein",
+      "priority": 47,
+      "domains": ["my-club.de"],
+      "strongSubjectKeywords": ["mitgliedsbeitrag"],
+      "subjectKeywords": ["spieltag"]
+    }
+  ]
+}
+```
+
+An entry whose `id` matches a built-in category **extends** it: list fields are
+merged, scalar fields replace. Any other `id` defines a new category and needs
+`label`, `folder`, `priority`, `domains` and `subjectKeywords`. A missing file
+is the normal case; a malformed one is reported on stderr and ignored, so a
+broken personal config never takes the server down.
+
+- **imap_list_categories**: List the built-in categories — id, label, destination
+  folder, matched domains and subject keywords, plus the scoring model. Call this
+  to learn the ids before restricting the other two tools.
+  ```
+  Parameters: none
+  ```
+
+- **imap_categorize_emails**: Classify the newest messages in a folder. Read-only —
+  nothing is moved, flagged, or deleted.
+  ```
+  Parameters:
+  - accountId: Account ID (or accountName)
+  - folder: Folder to examine (default: INBOX)
+  - limit: Newest messages to examine, 1-500 (default: 100)
+  - categories: Restrict to these category ids (optional)
+  - minScore: Minimum score to assign a category (default: 6)
+  - useHeaders: Fetch headers to detect mailing-list mail (default: true)
+  - sampleLimit: Examples per sample list, 1-200 (default: 20). Raise it when
+      auditing the rule set — the uncategorized samples are what reveal
+      missing domains and keywords.
+
+  Returns per-category counts and percentages, sample messages with the
+  reasons each category fired, and — for uncategorized mail — the best
+  candidate that stayed below the threshold.
+  ```
+
+- **imap_sort_inbox**: File messages into per-category folders. **Dry run by
+  default**: it reports the planned moves and changes nothing until `dryRun` is
+  set to `false`. Messages below the threshold are never moved unless
+  `moveUncategorizedTo` says where to put them. Moves are batched per destination
+  folder, one call per category rather than one per message.
+  ```
+  Parameters:
+  - accountId: Account ID (or accountName)
+  - folder: Source folder (default: INBOX)
+  - limit: Newest messages to examine, 1-500 (default: 100)
+  - categories: Restrict to these category ids (optional)
+  - minScore: Minimum score to assign a category (default: 6)
+  - useHeaders: Fetch headers to detect mailing-list mail (default: true)
+  - dryRun: Report only, move nothing (default: true)
+  - createFolders: Create a destination folder when missing (default: true)
+  - folderPrefix: Prefix incl. delimiter for every category destination,
+      e.g. "Archiv/" or "INBOX." (optional)
+  - moveUncategorizedTo: Folder for messages that reach no category, as a full
+      path — folderPrefix is not applied (optional; omit to leave them in place)
+  ```
+
+  Preview first, then execute:
+
+  ```
+  imap_sort_inbox { "folder": "INBOX", "limit": 100 }                  → plan only
+  imap_sort_inbox { "folder": "INBOX", "limit": 100, "dryRun": false } → moves
+  ```
+
+  **Re-sorting mail that was filed wrongly.** `folder` is any folder, not just
+  INBOX — point it at a category folder to re-classify what is already in there.
+  Messages whose category still matches the folder they are in are reported under
+  `skippedAlreadyInTargetFolder` and left untouched; only the misfiled ones move.
+  Add `moveUncategorizedTo` so mail that no longer belongs to any category goes
+  back to the inbox instead of staying stuck in the wrong folder:
+
+  ```
+  imap_sort_inbox { "folder": "Finanzen", "limit": 500, "moveUncategorizedTo": "INBOX" }
+  imap_sort_inbox { "folder": "Finanzen", "limit": 500, "moveUncategorizedTo": "INBOX", "dryRun": false }
+  ```
+
+  Note that the scan always covers the *newest* `limit` messages of the folder,
+  so a folder with more than 500 messages needs repeated runs — each run moves
+  mail out and thereby uncovers older messages for the next one.
 
 ## Security
 

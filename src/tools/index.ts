@@ -3,10 +3,12 @@ import { ImapService } from '../services/imap-service.js';
 import { AccountManager } from '../services/account-manager.js';
 import { SmtpService } from '../services/smtp-service.js';
 import { SpamService } from '../services/spam-service.js';
+import { CategoryService } from '../services/category-service.js';
 import { accountTools } from './account-tools.js';
 import { emailTools } from './email-tools.js';
 import { folderTools } from './folder-tools.js';
 import { spamTools } from './spam-tools.js';
+import { categoryTools } from './category-tools.js';
 
 /**
  * Read-only / safe-by-default subset of tools.
@@ -37,6 +39,9 @@ export const READ_ONLY_TOOLS: readonly string[] = [
   'imap_check_spam',
   'imap_domain_stats',
   'imap_list_spam_domains',
+  // Categories (classification only — imap_sort_inbox moves mail and is excluded)
+  'imap_list_categories',
+  'imap_categorize_emails',
 ];
 
 /** Normalize a configured tool name: lowercase and add the `imap_` prefix if missing. */
@@ -128,7 +133,11 @@ export function registerTools(
   imapService: ImapService,
   accountManager: AccountManager,
   smtpService: SmtpService,
-  spamService: SpamService
+  spamService: SpamService,
+  // Optional so existing 5-arg callers keep working. CategoryService is a pure,
+  // dependency-free classifier, so a default instance is always valid; the
+  // parameter exists so a caller can inject a custom rule set.
+  categoryService: CategoryService = new CategoryService()
 ): void {
   const enabled = resolveEnabledTools();
 
@@ -152,6 +161,9 @@ export function registerTools(
 
   // Register spam detection and management tools
   spamTools(target, imapService, spamService);
+
+  // Register email categorization and auto-filing tools
+  categoryTools(target, imapService, accountManager, categoryService);
 
   if (enabled) {
     // Log to stderr only — stdout is the JSON-RPC channel.

@@ -5,6 +5,8 @@ import { ImapService } from './services/imap-service.js';
 import { AccountManager } from './services/account-manager.js';
 import { SmtpService } from './services/smtp-service.js';
 import { SpamService } from './services/spam-service.js';
+import { CategoryService } from './services/category-service.js';
+import { loadCategoryRules } from './services/category-rules-file.js';
 import { registerTools } from './tools/index.js';
 
 // Silence any package version output to stdout
@@ -28,12 +30,14 @@ const imapService = new ImapService();
 const accountManager = new AccountManager();
 const smtpService = new SmtpService();
 const spamService = new SpamService();
+// Built-in rules, extended by ~/.imap-mcp/categories.json when present.
+const categoryService = new CategoryService(loadCategoryRules());
 
 // Allow ImapService to auto-connect using stored credentials
 imapService.setAccountManager(accountManager);
 
 // Register all tools
-registerTools(server, imapService, accountManager, smtpService, spamService);
+registerTools(server, imapService, accountManager, smtpService, spamService, categoryService);
 
 async function main() {
   const transport = new StdioServerTransport();

@@ -1,3 +1,5 @@
+import { extractEmailDomain } from '../utils/email-address.js';
+
 // Known spam/disposable email domains
 // This list can be extended or loaded from external sources
 const KNOWN_SPAM_DOMAINS: Set<string> = new Set([
@@ -139,15 +141,9 @@ export class SpamService {
   }
 
   extractDomain(email: string): string | null {
-    // Handle formats like "Name <email@domain.com>" and "email@domain.com"
-    const match = email.match(/<([^>]+)>/) || email.match(/([^\s<>]+@[^\s<>]+)/);
-    if (match) {
-      const parts = match[1].split('@');
-      if (parts.length === 2) {
-        return parts[1].toLowerCase();
-      }
-    }
-    return null;
+    // Handles "Name <email@domain.com>" and "email@domain.com". Shared with
+    // CategoryService so both services agree on what the sender domain is.
+    return extractEmailDomain(email);
   }
 
   checkEmail(email: string): SpamCheckResult {

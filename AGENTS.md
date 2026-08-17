@@ -30,12 +30,29 @@ working in this repository.
     `public/js/app.js` (the wizard is a static asset and cannot import it) —
     `tests/env-credentials.test.ts` asserts the two agree.
   - `SpamService` — disposable/known-spam domain detection.
+  - `CategoryService` — deterministic classification of messages into folder
+    categories from sender domain + subject keywords + mailing-list headers.
+    Rules are domain/keyword lists, never free-form regexes: an unanchored
+    regex over a whole address matches far more than it looks like it does
+    (`ing` hits `booking.com` and `marketing@`). Scoring and tie-breaking are
+    explicit (`priority`, then id) so the outcome never depends on rule order.
+    Sender-domain parsing is shared with `SpamService` via
+    `src/utils/email-address.ts` — keep it that way, two copies drift.
+    `DEFAULT_CATEGORY_RULES` stays limited to services any mailbox owner might
+    hear from. A rule set is a profile of its owner: a specific shop, club, or
+    hobby identifies a person, so those belong in the user's
+    `~/.imap-mcp/categories.json` (`category-rules-file.ts`), never in the
+    source — and the same applies to test fixtures.
 - **Tools** (`src/tools/`), grouped by area:
   - `account-tools.ts` — add / update / list / remove / connect / disconnect / test.
   - `email-tools.ts` — search, get, latest, send, reply, forward, save draft,
     mark read/unread, delete, bulk delete, move, attachments, upload, threads.
   - `folder-tools.ts` — list, status, create, unread counts.
   - `spam-tools.ts` — spam analysis, domain stats, allow/deny lists.
+  - `category-tools.ts` — list categories, classify a folder (read-only), and
+    `imap_sort_inbox`, which files mail into per-category folders. The sort tool
+    is `dryRun: true` by default and both tools share one classification helper,
+    so the preview can never disagree with the move it previews.
 - **Web setup wizard** — `src/web/server.ts` (Express) serves `public/` for
   account onboarding (`npm run setup` / `imap-setup`).
 - **Types** — `src/types/index.ts`.
@@ -55,7 +72,7 @@ npm run setup        # launch the web setup wizard
 ```
 
 Always run `npm run build` **and** `npm test` before committing changes that
-touch `src/`. Keep the suite green (currently 353 tests).
+touch `src/`. Keep the suite green (currently 461 tests).
 
 > Note: `npm run lint` (`tsc --noEmit`) is memory-hungry on this project — the
 > MCP SDK's `registerTool` generics are deep enough to surface a pre-existing
