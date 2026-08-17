@@ -159,6 +159,8 @@ describe('CategoryService — end-to-end classification per category', () => {
     ['energy provider', 'service@eon.de', 'Ihre Stromabrechnung 2026', 'energy'],
     ['municipal utility via the naming scheme', 'info@stadtwerke-musterstadt.de', 'Ihre Stromabrechnung', 'energy'],
     ['tax portal', 'noreply@elster.de', 'Ihr Steuerbescheid liegt bereit', 'authorities'],
+    ['ride-hailing receipt', 'noreply@uber.com', 'Ihre Fahrt am Dienstag', 'mobility'],
+    ['car rental', 'service@sixt.de', 'Ihr Mietwagen steht bereit', 'mobility'],
   ])('%s', (_name, from, subject, expected) => {
     expect(service.classify(msg(from, subject)).category?.id).toBe(expected);
   });
@@ -174,6 +176,13 @@ describe('CategoryService — end-to-end classification per category', () => {
     const result = service.classify(msg('shop@haendler-xyz.de', 'Seminar am 11.09.'));
     expect(result.category).toBeNull();
     expect(result.candidates.find(c => c.id === 'education')?.score).toBe(SUBJECT_KEYWORD_WEIGHT);
+  });
+
+  it('keeps a booked journey in travel rather than mobility', () => {
+    // The two are neighbours: a flight confirmation must not end up among taxi
+    // receipts, so travel outranks mobility.
+    const result = service.classify(msg('service@lufthansa.com', 'Ihre Buchungsbestätigung'));
+    expect(result.category?.id).toBe('travel');
   });
 
   it('files a payslip as payroll rather than finance', () => {

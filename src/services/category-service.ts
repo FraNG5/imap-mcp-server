@@ -201,7 +201,7 @@ export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
       'postbank.de', 'visa.com', 'mastercard.com',
       'americanexpress.com', 'amex.de', 'barclays.de', 'targobank.de',
       'santander.de', 'hypovereinsbank.de', 'consorsbank.de', 'revolut.com',
-      'wise.com', 'stripe.com',
+      'wise.com', 'stripe.com', 'banknorwegian.de', 'lbb.de', 'f-i.de',
     ],
     // Germany's cooperative and savings banks each run their own regional
     // domain; listing them individually would mean ~350 entries.
@@ -233,8 +233,9 @@ export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
     priority: 85,
     domains: [
       'doctolib.de', 'doctolib.com', 'jameda.de', 'aok.de', 'tk.de',
-      'barmer.de', 'dak.de', 'shop-apotheke.com', 'docmorris.de',
-      'fielmann.de', 'apollo.de',
+      'barmer.de', 'dak.de', 'shop-apotheke.com', 'docmorris.de', 'medpex.de',
+      'fielmann.de', 'apollo.de', 'betterdoc.org', 'generali.de',
+      'start-ghs.com',
     ],
     strongSubjectKeywords: ['arzttermin', 'impftermin', 'rezept'],
     subjectKeywords: ['verordnung', 'untersuchung', 'befund', 'krankenkasse', 'praxis'],
@@ -249,6 +250,7 @@ export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
       'github.com', 'gitlab.com', 'bitbucket.org', 'npmjs.com', 'docker.com',
       'amazonaws.com', 'digitalocean.com', 'vercel.com', 'cloudflare.com',
       'atlassian.com', 'atlassian.net', 'sentry.io', 'circleci.com',
+      'adobe.com', 'oracle-mail.com',
     ],
     strongSubjectKeywords: ['pull request', 'merge request', 'dependabot'],
     subjectKeywords: ['deployment', 'build failed', 'security advisory', 'workflow run'],
@@ -260,7 +262,8 @@ export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
     priority: 75,
     domains: [
       'telekom.de', 'vodafone.de', 'o2online.de', 'congstar.de', '1und1.de',
-      'ionos.de', 'ionos.com', 'all-inkl.com', 'strato.de',
+      'ionos.de', 'ionos.com', 'kundenserver.de', 'all-inkl.com', 'strato.de',
+      'alditalk-kundenbetreuung.de',
     ],
     subjectKeywords: [
       'tarifwechsel', 'mobilfunkrechnung', 'sim-karte', 'vertragsverlängerung',
@@ -305,7 +308,7 @@ export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
     priority: 68,
     domains: [
       'eon.de', 'vattenfall.de', 'enbw.com', 'yello.de', 'lichtblick.de',
-      'octopusenergy.de',
+      'octopusenergy.de', 'rheinenergie.com', 'ewe-go.de',
     ],
     domainPrefixes: ['stadtwerke-'],
     strongSubjectKeywords: [
@@ -345,11 +348,28 @@ export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
     domains: [
       'booking.com', 'check24.de', 'expedia.de', 'kayak.de', 'skyscanner.de', 'ryanair.com',
       'lufthansa.com', 'eurowings.com', 'airbnb.com', 'bahn.de', 'flixbus.de',
-      'trivago.de',
+      'trivago.de', 'hotels.com', 'getyourguide.com', 'milesandmore.com',
+      // Hotel guest-service platform, used by many independent hotels.
+      'straiv.io',
     ],
     strongSubjectKeywords: ['buchungsbestätigung', 'flugticket', 'reiseunterlagen'],
     subjectKeywords: ['reservierung', 'boarding', 'check-in', 'hotelbuchung'],
     senderKeywords: ['buchung', 'booking', 'reisebuero', 'reiseagentur'],
+  },
+  {
+    // Ride-hailing, car-sharing and rentals. Kept apart from travel: these are
+    // everyday local trips whose receipts pile up, while travel is the booked
+    // journey — mixing them buries the flight confirmation under taxi fares.
+    id: 'mobility',
+    label: '🚗 Mobilität',
+    folder: 'Mobilität',
+    priority: 53,
+    domains: [
+      'uber.com', 'freenow.com', 'sixt.de', 'europcar.de', 'hertz.de',
+      'share-now.com', 'miles-mobility.com', 'flinkster.de', 'nextbike.de',
+    ],
+    strongSubjectKeywords: ['fahrtquittung'],
+    subjectKeywords: ['mietwagen', 'fahrt'],
   },
   {
     id: 'shopping',
@@ -360,7 +380,8 @@ export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
       'amazon.de', 'amazon.com', 'ebay.de', 'ebay.com', 'kleinanzeigen.de',
       'zalando.de', 'otto.de', 'mediamarkt.de', 'saturn.de', 'lieferando.de',
       'hellofresh.de', 'flaconi.de', 'douglas.de', 'dm.de', 'rossmann.de',
-      'ikea.com', 'thomann.de', 'audible.de', 'payback.de',
+      'ikea.com', 'thomann.de', 'audible.de', 'payback.de', 'nespresso.com',
+      'sageappliances.com', 'subway.com', 'samsung-mail.com',
       // Shopify's shared sending domain: used by many small merchants at once,
       // so one entry covers a whole class of shop mail.
       'shopifyemail.com',
@@ -407,8 +428,8 @@ export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
     priority: 35,
     domains: [
       'netflix.com', 'spotify.com', 'disneyplus.com', 'primevideo.com',
-      'sky.de', 'wowtv.de', 'eventim.de', 'twitch.tv', 'steampowered.com',
-      'uci-kinowelt.info', 'cinemaxx.de',
+      'sky.de', 'wowtv.de', 'joyn.de', 'eventim.de', 'twitch.tv',
+      'steampowered.com', 'blizzard.com', 'uci-kinowelt.info', 'cinemaxx.de',
     ],
     subjectKeywords: ['konzertticket', 'neue folge', 'watchlist', 'kinoprogramm'],
   },
@@ -433,7 +454,10 @@ export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
     folder: 'Newsletter',
     priority: 10,
     // Senders whose every mail is a newsletter but who omit List-Unsubscribe.
-    domains: ['componentsource.com', 'psd-tutorials.de', 'teltarif.de'],
+    domains: [
+      'componentsource.com', 'psd-tutorials.de', 'teltarif.de',
+      'theinsidersnet.com',
+    ],
     listHeaderSignal: true,
     strongSubjectKeywords: ['newsletter'],
     subjectKeywords: [
