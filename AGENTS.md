@@ -51,7 +51,9 @@ working in this repository.
     defines a new one. Selection via `IMAP_MCP_CATEGORY_PRESET`, default `core`; the directory
     they are read from via `IMAP_MCP_PRESETS_DIR`, which defaults to the one
     beside the running server — without it an installed copy silently serves its
-    own stale files. Read once at startup, no reload.
+    own stale files. Read once at startup, no reload. Rule files are BOM-tolerant, and a new
+    category needs a name plus any one matching signal — not a keyword list,
+    which a category of named people has no use for.
     Keep `core` free of any one language or country — `tests/category-rules-
     file.test.ts` fails on a `.de` domain or an umlaut in it. And a rule set is
     a profile of its owner: a specific shop, club, or hobby identifies a person,
@@ -94,7 +96,7 @@ npm run setup        # launch the web setup wizard
 ```
 
 Always run `npm run build` **and** `npm test` before committing changes that
-touch `src/`. Keep the suite green (currently 532 tests).
+touch `src/`. Keep the suite green (currently 541 tests).
 
 > Note: `npm run lint` (`tsc --noEmit`) is memory-hungry on this project — the
 > MCP SDK's `registerTool` generics are deep enough to surface a pre-existing

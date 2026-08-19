@@ -296,3 +296,84 @@ describe('IMAP_MCP_PRESETS_DIR', () => {
     expect(presetsDir({} as any)).toBe(path.resolve('presets'));
   });
 });
+
+describe('robustness of hand-edited rule files', () => {
+  it('accepts a category defined by addresses alone', () => {
+    // A category of named people has no keywords, and demanding an empty
+    // keyword list from it would be a formality that costs the whole rule.
+    const skipped: string[] = [];
+    const rules = mergeRuleLayers([
+      BASE,
+      [{
+        id: 'crew', label: '⛵ Crew', folder: 'Crew', priority: 63,
+        domains: [], addresses: ['a@example.test', 'b@example.test'],
+      }],
+    ], id => skipped.push(id));
+
+    expect(skipped).toEqual([]);
+    expect(rules.map(r => r.id)).toContain('crew');
+  });
+
+  it.each([
+    ['recipients only', { recipients: ['me@work.test'] }],
+    ['a domain prefix only', { domainPrefixes: ['sparkasse-'] }],
+    ['a sender keyword only', { senderKeywords: ['rechnung'] }],
+    ['the mailing-list signal only', { listHeaderSignal: true }],
+  ])('accepts a category matching on %s', (_name, signal) => {
+    const rules = mergeRuleLayers([
+      BASE,
+      [{ id: 'x', label: 'X', folder: 'X', priority: 9, ...signal } as any],
+    ]);
+    expect(rules.map(r => r.id)).toContain('x');
+  });
+
+  it('still rejects a category with nothing to match on, and says so', () => {
+    const reasons: string[] = [];
+    const rules = mergeRuleLayers(
+      [BASE, [{ id: 'empty', label: 'E', folder: 'E', priority: 9 }]],
+      (_id, reason) => reasons.push(reason),
+    );
+
+    expect(rules.map(r => r.id)).not.toContain('empty');
+    expect(reasons[0]).toContain('nothing to match on');
+  });
+
+  it('names the missing field when the category is unnamed', () => {
+    const reasons: string[] = [];
+    mergeRuleLayers(
+      [BASE, [{ id: 'half', label: 'H', domains: ['x.test'] }]],
+      (_id, reason) => reasons.push(reason),
+    );
+    expect(reasons[0]).toContain('folder, priority');
+  });
+
+  it('reads a preset that a Windows editor saved with a BOM', () => {
+    // JSON.parse rejects a BOM, which would silently cost the whole preset.
+    const custom = mkdtempSync(path.join(tmpdir(), 'imap-mcp-bom-'));
+    writeFileSync(
+      path.join(custom, 'core.json'),
+      '﻿' + JSON.stringify({
+        name: 'core',
+        rules: [{ id: 'bom', label: 'B', folder: 'B', priority: 1, domains: ['bom.test'], subjectKeywords: [] }],
+      }),
+      'utf-8',
+    );
+
+    try {
+      const rules = loadCategoryRules({
+        presets: ['core'],
+        userFile: path.join(dir, 'missing.json'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      expect(rules.length).toBeGreaterThan(0);
+    } finally {
+      rmSync(custom, { recursive: true, force: true });
+    }
+  });
+
+  it('reads a user file saved with a BOM', () => {
+    write('﻿' + JSON.stringify({ rules: [{ id: 'finance', folder: 'Meine Bank' }] }));
+    const rules = loadCategoryRules({ presets: ['core'], userFile: file });
+    expect(rules.find(r => r.id === 'finance')?.folder).toBe('Meine Bank');
+  });
+});

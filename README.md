@@ -762,10 +762,17 @@ source:
 ```
 
 An entry whose `id` matches a known category extends it; any other `id` defines
-a new one and needs `label`, `folder`, `priority`, `domains` and
-`subjectKeywords`. A missing file is the normal case; a malformed one, or an
-unknown preset name, is reported on stderr and skipped, so a broken
-configuration never takes the server down.
+a new one and needs `label`, `folder`, `priority`, and **at least one way to
+match** — any of `domains`, `addresses`, `recipients`, `domainPrefixes`,
+`subjectKeywords`, `strongSubjectKeywords`, `senderKeywords`, or
+`listHeaderSignal`. A category of named people is all addresses and no keywords,
+which is fine.
+
+A missing file is the normal case. A malformed one, an unknown preset, or a
+category that cannot be applied is reported **on stderr** and skipped, so a
+broken configuration never takes the server down — but do read that output when
+a rule seems not to work, because that is where it says why. Files saved with a
+UTF-8 BOM (common on Windows) are read normally.
 
 - **imap_list_categories**: List the built-in categories — id, label, destination
   folder, matched domains and subject keywords, plus the scoring model. Call this

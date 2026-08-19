@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import { CategoryRule } from './category-service.js';
-import { readPreset, resolvePresetNames } from './category-presets.js';
+import { readPreset, resolvePresetNames, stripBom } from './category-presets.js';
 
 /**
  * Optional user rule file, alongside the account store.
@@ -54,13 +54,36 @@ function mergeRule(base: CategoryRule, patch: Partial<CategoryRule>): CategoryRu
  * whole rule set.
  */
 function isCompleteRule(entry: Partial<CategoryRule> & { id: string }): entry is CategoryRule {
-  return (
+  const named =
     typeof entry.label === 'string' &&
     typeof entry.folder === 'string' &&
-    typeof entry.priority === 'number' &&
-    Array.isArray(entry.domains) &&
-    Array.isArray(entry.subjectKeywords)
-  );
+    typeof entry.priority === 'number';
+
+  // At least one way to match. Which one is up to the author: a category of
+  // named people is all addresses and no keywords, and demanding an empty
+  // keyword list from it would be a formality that costs the whole rule.
+  const matchable =
+    (entry.domains?.length ?? 0) > 0 ||
+    (entry.addresses?.length ?? 0) > 0 ||
+    (entry.recipients?.length ?? 0) > 0 ||
+    (entry.domainPrefixes?.length ?? 0) > 0 ||
+    (entry.subjectKeywords?.length ?? 0) > 0 ||
+    (entry.strongSubjectKeywords?.length ?? 0) > 0 ||
+    (entry.senderKeywords?.length ?? 0) > 0 ||
+    entry.listHeaderSignal === true;
+
+  return named && matchable;
+}
+
+/** Say which half of {@link isCompleteRule} an entry failed, so the log is actionable. */
+function whyIncomplete(entry: Partial<CategoryRule> & { id: string }): string {
+  const missing = (['label', 'folder', 'priority'] as const).filter(k => entry[k] === undefined);
+  if (missing.length > 0) {
+    return `no earlier layer defines it and it lacks ${missing.join(', ')}`;
+  }
+  return 'no earlier layer defines it and it has nothing to match on ' +
+    '(needs at least one of domains, addresses, recipients, domainPrefixes, ' +
+    'subjectKeywords, strongSubjectKeywords, senderKeywords, listHeaderSignal)';
 }
 
 /**
@@ -86,7 +109,7 @@ export function mergeRuleLayers(
         continue;
       }
       if (!isCompleteRule(entry)) {
-        onSkip(entry.id, 'no earlier layer defines it, and it lacks label, folder, priority, domains or subjectKeywords');
+        onSkip(entry.id, whyIncomplete(entry));
         continue;
       }
       byId.set(entry.id, entry);
@@ -102,7 +125,7 @@ function readUserRules(filePath: string): RuleLayer | null {
 
   let parsed: CategoryRulesFile;
   try {
-    parsed = JSON.parse(readFileSync(filePath, 'utf-8')) as CategoryRulesFile;
+    parsed = JSON.parse(stripBom(readFileSync(filePath, 'utf-8'))) as CategoryRulesFile;
   } catch (err) {
     console.error(
       `[imap-mcp] Ignoring ${filePath}: not valid JSON (${err instanceof Error ? err.message : 'parse error'}).`
@@ -143,7 +166,7 @@ export function loadCategoryRules(options: LoadOptions = {}): CategoryRule[] {
       layers.push(readPreset(name).rules);
       loaded.push(name);
     } catch (err) {
-      console.error(`[imap-mcp] ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`[imap-mcp] Preset "${name}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

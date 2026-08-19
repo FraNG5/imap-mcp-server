@@ -8,14 +8,16 @@
       "folder": "Security",
       "priority": 95,
       "domains": [
-        "accountprotection.microsoft.com"
+        "accountprotection.microsoft.com",
+        "id.apple.com"
       ],
       "strongSubjectKeywords": [
         "security alert",
         "verification code",
         "privacy policy",
         "terms of service",
-        "recent account login"
+        "recent account login",
+        "apple-id"
       ],
       "subjectKeywords": [
         "login",
@@ -344,7 +346,8 @@
         "crowdfarming.com",
         "markenmehrwert.com",
         "digitalriver.com",
-        "shopifyemail.com"
+        "shopifyemail.com",
+        "orders.apple.com"
       ],
       "strongSubjectKeywords": [
         "order confirmation"
@@ -438,7 +441,9 @@
         "mistral.ai"
       ],
       "strongSubjectKeywords": [
-        "subscription"
+        "subscription",
+        "family sharing",
+        "joined your family"
       ],
       "subjectKeywords": [
         "free trial",
@@ -452,7 +457,8 @@
       "priority": 10,
       "domains": [
         "componentsource.com",
-        "theinsidersnet.com"
+        "theinsidersnet.com",
+        "insideapple.apple.com"
       ],
       "listHeaderSignal": true,
       "strongSubjectKeywords": [

@@ -52,6 +52,15 @@ export function presetsDir(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(process.cwd(), 'presets');
 }
 
+/**
+ * Drop a UTF-8 byte order mark. Windows editors write one routinely and
+ * `JSON.parse` rejects it, which would silently cost a whole preset — the rules
+ * simply stay as they were, with nothing in the output to say why.
+ */
+export function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+}
+
 export interface PresetFile {
   name?: string;
   description?: string;
@@ -81,7 +90,7 @@ export function readPreset(name: string): PresetFile {
   if (!existsSync(file)) {
     throw new Error(`Unknown preset "${name}". Available: ${availablePresets().join(', ') || 'none'}.`);
   }
-  const parsed = JSON.parse(readFileSync(file, 'utf-8')) as PresetFile;
+  const parsed = JSON.parse(stripBom(readFileSync(file, 'utf-8'))) as PresetFile;
   if (!parsed || !Array.isArray(parsed.rules)) {
     throw new Error(`Preset "${name}" is malformed: expected an object with a "rules" array.`);
   }
