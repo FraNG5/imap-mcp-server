@@ -39,6 +39,8 @@ function mergeRule(base: CategoryRule, patch: Partial<CategoryRule>): CategoryRu
     ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
     ...(patch.listHeaderSignal !== undefined ? { listHeaderSignal: patch.listHeaderSignal } : {}),
     domains: union(base.domains, patch.domains),
+    addresses: union(base.addresses, patch.addresses),
+    recipients: union(base.recipients, patch.recipients),
     domainPrefixes: union(base.domainPrefixes, patch.domainPrefixes),
     subjectKeywords: union(base.subjectKeywords, patch.subjectKeywords),
     strongSubjectKeywords: union(base.strongSubjectKeywords, patch.strongSubjectKeywords),

@@ -34,7 +34,11 @@ working in this repository.
     categories from sender domain + subject keywords + mailing-list headers.
     Rules are domain/keyword lists, never free-form regexes: an unanchored
     regex over a whole address matches far more than it looks like it does
-    (`ing` hits `booking.com` and `marketing@`). Scoring and tie-breaking are
+    (`ing` hits `booking.com` and `marketing@`). A rule can also name full
+    sender addresses (`addresses`, scored above a domain so the more specific
+    rule wins — the only way to classify freemail senders) and recipient
+    addresses (`recipients`, scored below every sender signal but enough alone,
+    which separates a work address from a private one in a shared mailbox). Scoring and tie-breaking are
     explicit (`priority`, then id) so the outcome never depends on rule order.
     Sender-domain parsing is shared with `SpamService` via
     `src/utils/email-address.ts` — keep it that way, two copies drift.
@@ -87,7 +91,7 @@ npm run setup        # launch the web setup wizard
 ```
 
 Always run `npm run build` **and** `npm test` before committing changes that
-touch `src/`. Keep the suite green (currently 511 tests).
+touch `src/`. Keep the suite green (currently 524 tests).
 
 > Note: `npm run lint` (`tsc --noEmit`) is memory-hungry on this project — the
 > MCP SDK's `registerTool` generics are deep enough to surface a pre-existing

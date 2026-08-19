@@ -5,6 +5,8 @@ import {
   SUBJECT_KEYWORD_WEIGHT,
   STRONG_SUBJECT_KEYWORD_WEIGHT,
   LOCAL_PART_WEIGHT,
+  ADDRESS_WEIGHT,
+  RECIPIENT_WEIGHT,
   CategoryRule,
 } from '../src/services/category-service.js';
 import { germanRules } from './preset-rules.js';
@@ -443,5 +445,86 @@ describe('CategoryService — rule set integrity', () => {
         expect(generic, `rule ${rule.id}`).not.toContain(keyword);
       }
     }
+  });
+});
+
+describe('CategoryService — sender and recipient addresses', () => {
+  const rules: CategoryRule[] = [
+    {
+      id: 'family', label: '💛 Familie', folder: 'Familie', priority: 93,
+      domains: [], addresses: ['Hans.Mueller@gmail.com'], subjectKeywords: [],
+    },
+    {
+      id: 'business', label: '🏢 Geschäftlich', folder: 'Geschaeftlich', priority: 91,
+      domains: [], recipients: ['ich@firma.de'], subjectKeywords: [],
+    },
+    {
+      id: 'freemail', label: '📧 Freemail', folder: 'Freemail', priority: 20,
+      domains: ['gmail.com'], subjectKeywords: [],
+    },
+    {
+      id: 'shopping', label: '🛒 Shopping', folder: 'Shopping', priority: 50,
+      domains: ['shop.example'], subjectKeywords: [],
+    },
+  ];
+  const svc = new CategoryService(rules);
+
+  it('matches a full sender address', () => {
+    const r = svc.classify({ from: 'Hans <hans.mueller@gmail.com>', subject: 'Hallo' });
+    expect(r.category?.id).toBe('family');
+    expect(r.category?.reasons).toContain('address:hans.mueller@gmail.com');
+  });
+
+  it('is case-insensitive on both sides', () => {
+    const r = svc.classify({ from: 'HANS.MUELLER@GMAIL.COM', subject: 'Hallo' });
+    expect(r.category?.id).toBe('family');
+  });
+
+  it('lets an address beat a domain rule for the same provider', () => {
+    // The whole point: gmail.com says nothing about a person, one address does.
+    const named = svc.classify({ from: 'hans.mueller@gmail.com', subject: 'Hallo' });
+    const other = svc.classify({ from: 'fremder@gmail.com', subject: 'Hallo' });
+
+    expect(named.category?.id).toBe('family');
+    expect(named.category?.score).toBe(ADDRESS_WEIGHT);
+    expect(other.category?.id).toBe('freemail');
+  });
+
+  it('does not match a different mailbox at the same domain', () => {
+    const r = svc.classify({ from: 'hans.mueller2@gmail.com', subject: 'Hallo' });
+    expect(r.category?.id).toBe('freemail');
+  });
+
+  it('matches a recipient address from the To field', () => {
+    const r = svc.classify({ from: 'wer@auch-immer.de', to: ['ich@firma.de'], subject: 'Hallo' });
+    expect(r.category?.id).toBe('business');
+    expect(r.category?.reasons).toContain('recipient:ich@firma.de');
+  });
+
+  it('finds the recipient among several', () => {
+    const r = svc.classify({
+      from: 'wer@auch-immer.de',
+      to: ['Jemand <jemand@extern.de>', 'Ich <ICH@firma.de>'],
+      subject: 'Hallo',
+    });
+    expect(r.category?.id).toBe('business');
+  });
+
+  it('lets the sender outrank the recipient', () => {
+    // An order confirmation sent to a work address is still shopping.
+    const r = svc.classify({ from: 'orders@shop.example', to: ['ich@firma.de'], subject: 'Hallo' });
+    expect(r.category?.id).toBe('shopping');
+    expect(r.candidates.find(c => c.id === 'business')?.score).toBe(RECIPIENT_WEIGHT);
+  });
+
+  it('classifies on the recipient alone', () => {
+    const r = svc.classify({ from: 'unbekannt@nirgends.de', to: ['ich@firma.de'], subject: 'Hallo' });
+    expect(r.category?.score).toBe(RECIPIENT_WEIGHT);
+    expect(r.category?.id).toBe('business');
+  });
+
+  it('ignores recipient rules when no To field was fetched', () => {
+    const r = svc.classify({ from: 'unbekannt@nirgends.de', subject: 'Hallo' });
+    expect(r.category).toBeNull();
   });
 });

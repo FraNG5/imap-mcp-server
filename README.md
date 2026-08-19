@@ -649,13 +649,24 @@ Scoring, against a default threshold of 6:
 
 | Signal | Score |
 |---|---|
+| Full sender address (`hans@gmail.com`) | 12 |
 | Sender domain, or a `List-Unsubscribe`/`List-Id` header | 10 |
 | Strong subject keyword — wording that names the message type (`Rechnung`, `Sicherheitswarnung`, `Bestellbestätigung`) | 6 |
 | Sender mailbox name (`rechnung@`, `versand@`) | 5 |
+| Recipient address, matched against the To field | 6 |
 | Subject keyword | 3 |
 
 So a domain hit classifies, as does a strong keyword; a mailbox name needs one
-keyword alongside it, and a weak keyword needs a second signal. The two keyword
+keyword alongside it, and a weak keyword needs a second signal.
+
+An exact **sender address** outranks a domain, because the more specific rule has
+to win: naming one person at a freemail provider is the only way to classify
+them, since `gmail.com` says nothing about who is writing. A **recipient
+address** sits below every sender signal — which of your addresses received a
+message is weaker evidence of what it is than who sent it, so an order
+confirmation to a work address is still shopping — but it is enough on its own,
+which separates the mail of a work address from a private one in a shared
+mailbox. The two keyword
 tiers exist because strength is a property of the word, not the category: a
 subject saying "Ihre Rechnung" is an invoice, while "Whisky Seminar" merely
 mentions a seminar and must not be filed as education.

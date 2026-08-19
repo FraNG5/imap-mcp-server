@@ -69,6 +69,7 @@ export function categoryTools(
       messages.map(m => ({
         uid: m.uid,
         from: m.from,
+        to: m.to,
         subject: m.subject,
         headers: headersByUid.get(m.uid),
       })),
@@ -110,6 +111,8 @@ export function categoryTools(
             folder: rule.folder,
             priority: rule.priority,
             domains: rule.domains,
+            addresses: rule.addresses ?? [],
+            recipients: rule.recipients ?? [],
             domainPrefixes: rule.domainPrefixes ?? [],
             strongSubjectKeywords: rule.strongSubjectKeywords ?? [],
             subjectKeywords: rule.subjectKeywords,
@@ -117,8 +120,10 @@ export function categoryTools(
             usesListHeaders: rule.listHeaderSignal === true,
           })),
           scoring: {
+            senderAddressHit: 12,
             domainHit: 10,
             listHeaderHit: 10,
+            recipientAddressHit: 6,
             strongSubjectKeywordHit: 6,
             senderLocalPartHit: 5,
             subjectKeywordHit: 3,

@@ -1,5 +1,6 @@
 import {
   extractEmailDomain,
+  extractEmailAddress,
   extractEmailLocalPart,
   domainMatches,
   domainLabelStartsWith,
@@ -29,6 +30,22 @@ export interface CategoryRule {
    * `notamazon.de`.
    */
   domains: string[];
+  /**
+   * Full sender addresses, matched exactly and case-insensitively. Scored above
+   * a domain hit: an address is the more specific statement, so a rule naming
+   * `hans@gmail.com` must beat one naming `gmail.com`. This is the only way to
+   * classify freemail senders, where the domain says nothing about the person.
+   */
+  addresses?: string[];
+  /**
+   * Recipient addresses, matched against the message's To field. Separates the
+   * mail of one address from another in a shared mailbox — everything sent to a
+   * work address is work mail, whoever wrote it. Scored below the sender
+   * signals: who sent a message says more about what it is than which of your
+   * addresses received it, so an order confirmation to a work address is still
+   * shopping.
+   */
+  recipients?: string[];
   /**
    * Domain-label prefixes, for families of senders that share a naming scheme
    * but not a domain — Germany has roughly 350 regional Sparkassen, each on its
@@ -94,6 +111,8 @@ export interface CategoryCandidate {
 export interface ClassificationInput {
   uid?: number;
   from: string;
+  /** Recipient addresses (the To field). Needed only for `recipients` rules. */
+  to?: string[];
   subject: string;
   /**
    * Lowercased header map as returned by `ImapService.fetchHeadersForUids`.
@@ -118,6 +137,18 @@ export interface Classification {
 export const DOMAIN_WEIGHT = 10;
 /** A mailing-list header hit. As strong as a domain hit, and for the same reason. */
 export const LIST_HEADER_WEIGHT = 10;
+/**
+ * An exact sender-address hit. Above {@link DOMAIN_WEIGHT} on purpose: the more
+ * specific rule has to win, or naming one person at a freemail provider could
+ * never override a rule about that provider.
+ */
+export const ADDRESS_WEIGHT = 12;
+/**
+ * A recipient-address hit. Enough to classify alone, but any sender-domain hit
+ * outranks it: which of your addresses received a message is weaker evidence of
+ * what it is than who sent it.
+ */
+export const RECIPIENT_WEIGHT = 6;
 /**
  * A sender local-part hit. Deliberately just below the threshold: the sender
  * names its own mailbox, so this is strong evidence but not proof — a mail from
@@ -211,7 +242,11 @@ export class CategoryService {
     const only = options.only && options.only.length > 0 ? new Set(options.only) : null;
 
     const domain = extractEmailDomain(input.from);
+    const address = extractEmailAddress(input.from);
     const localPart = extractEmailLocalPart(input.from);
+    const recipients = (input.to ?? [])
+      .map(extractEmailAddress)
+      .filter((a): a is string => a !== null);
     const subject = input.subject || '';
     const hasListHeaders = headersLookLikeBulkMail(input.headers);
 
@@ -222,6 +257,22 @@ export class CategoryService {
 
       let score = 0;
       const reasons: string[] = [];
+
+      if (address && rule.addresses?.length) {
+        const hit = rule.addresses.find(a => a.toLowerCase() === address);
+        if (hit) {
+          score += ADDRESS_WEIGHT;
+          reasons.push(`address:${hit.toLowerCase()}`);
+        }
+      }
+
+      if (recipients.length > 0 && rule.recipients?.length) {
+        const hit = rule.recipients.find(r => recipients.includes(r.toLowerCase()));
+        if (hit) {
+          score += RECIPIENT_WEIGHT;
+          reasons.push(`recipient:${hit.toLowerCase()}`);
+        }
+      }
 
       if (domain) {
         // At most one domain-strength hit per rule, whether it comes from the

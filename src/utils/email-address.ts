@@ -25,6 +25,16 @@ export function extractEmailDomain(address: string): string | null {
 }
 
 /**
+ * Extract the bare address (`user@host`, lowercased) from either
+ * `"Name <user@host>"` or a plain address. Returns `null` when no address-like
+ * token is present.
+ */
+export function extractEmailAddress(address: string): string | null {
+  const parts = splitAddress(address);
+  return parts ? `${parts.local}@${parts.domain}` : null;
+}
+
+/**
  * Extract the local part (everything before the `@`) of an address, lowercased.
  * The sender's own mailbox name is chosen to describe what it sends —
  * `rechnung@…`, `newsletter@…`, `versand@…` — which makes it a usable signal
