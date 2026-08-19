@@ -13,8 +13,10 @@ const mockServer = {
 
 const mockImapService = {
   getLatestEmails: vi.fn(),
+  searchEmails: vi.fn(),
   fetchHeadersForUids: vi.fn(),
   moveEmail: vi.fn(),
+  addKeywordToUids: vi.fn(),
 };
 
 const mockAccountManager = { resolveAccountId: vi.fn((id: string) => id) };
@@ -27,6 +29,7 @@ const base = {
   categories: undefined,
   minScore: undefined,
   useHeaders: false,
+  cursorKeyword: undefined,
 };
 
 const parse = (result: any) => JSON.parse(result.content[0].text);
@@ -38,6 +41,7 @@ describe('category tools', () => {
     vi.clearAllMocks();
     handlers.clear();
     mockImapService.fetchHeadersForUids.mockResolvedValue(new Map());
+    mockImapService.addKeywordToUids.mockResolvedValue(0);
     categoryTools(
       mockServer as any,
       mockImapService as any,
@@ -389,5 +393,130 @@ describe('category tools', () => {
         'acc1', 'INBOX', [2], 'Shopping', { createDestinationIfMissing: true },
       );
     });
+  });
+});
+
+describe('imap_sort_inbox — cursor keyword', () => {
+  const runBase = {
+    accountId: 'acc1', folder: 'Unsortiert', limit: 100,
+    categories: undefined, minScore: undefined, useHeaders: false,
+    dryRun: false, createFolders: true, folderPrefix: undefined,
+    moveUncategorizedTo: undefined, cursorKeyword: '$imapmcpChecked',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    mockImapService.fetchHeadersForUids.mockResolvedValue(new Map());
+    mockImapService.addKeywordToUids.mockResolvedValue(0);
+    categoryTools(
+      mockServer as any,
+      mockImapService as any,
+      mockAccountManager as any,
+      new CategoryService(germanRules()),
+    );
+  });
+
+  it('selects unmarked messages instead of the newest ones', async () => {
+    mockImapService.searchEmails.mockResolvedValueOnce([]);
+
+    await handlers.get('imap_sort_inbox')!(runBase);
+
+    expect(mockImapService.searchEmails).toHaveBeenCalledWith(
+      'acc1', 'Unsortiert', { unKeywords: ['$imapmcpChecked'] },
+    );
+    expect(mockImapService.getLatestEmails).not.toHaveBeenCalled();
+  });
+
+  it('honours limit when the search returns more than one batch', async () => {
+    mockImapService.searchEmails.mockResolvedValueOnce(
+      Array.from({ length: 250 }, (_, i) => email(i + 1, `a${i}@nirgendwo-xyz.de`, 'Hallo')),
+    );
+
+    const parsed = parse(await handlers.get('imap_sort_inbox')!({ ...runBase, limit: 100 }));
+    expect(parsed.totalExamined).toBe(100);
+  });
+
+  it('marks what stayed so the next call gets the next batch', async () => {
+    mockImapService.searchEmails.mockResolvedValueOnce([
+      email(1, 'a@github.com', 'Ping'),          // moves to Dev
+      email(2, 'b@nirgendwo-xyz.de', 'Hallo'),   // stays
+      email(3, 'c@nirgendwo-xyz.de', 'Servus'),  // stays
+    ]);
+    mockImapService.moveEmail.mockResolvedValueOnce({
+      destination: 'Dev', results: [{ uid: 1, destination: 'Dev' }],
+    });
+    mockImapService.addKeywordToUids.mockResolvedValueOnce(2);
+
+    const parsed = parse(await handlers.get('imap_sort_inbox')!(runBase));
+
+    // Only the two that stayed — the moved one has left the folder.
+    expect(mockImapService.addKeywordToUids).toHaveBeenCalledWith(
+      'acc1', 'Unsortiert', [2, 3], '$imapmcpChecked',
+    );
+    expect(parsed.markedCount).toBe(2);
+    expect(parsed.cursorKeyword).toBe('$imapmcpChecked');
+  });
+
+  it('does not mark anything on a dry run', async () => {
+    mockImapService.searchEmails.mockResolvedValueOnce([
+      email(1, 'a@nirgendwo-xyz.de', 'Hallo'),
+    ]);
+
+    await handlers.get('imap_sort_inbox')!({ ...runBase, dryRun: true });
+
+    expect(mockImapService.addKeywordToUids).not.toHaveBeenCalled();
+    expect(mockImapService.moveEmail).not.toHaveBeenCalled();
+  });
+
+  it('leaves a failed move unmarked so it is retried', async () => {
+    mockImapService.searchEmails.mockResolvedValueOnce([
+      email(1, 'a@github.com', 'Ping'),
+    ]);
+    mockImapService.moveEmail.mockResolvedValueOnce({
+      destination: 'Dev', results: [{ uid: 1, error: 'NO permission denied' }],
+    });
+
+    await handlers.get('imap_sort_inbox')!(runBase);
+
+    expect(mockImapService.addKeywordToUids).toHaveBeenCalledWith(
+      'acc1', 'Unsortiert', [], '$imapmcpChecked',
+    );
+  });
+
+  it('reports a failed marker without failing the move that already happened', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockImapService.searchEmails.mockResolvedValueOnce([
+      email(1, 'a@github.com', 'Ping'),
+      email(2, 'b@nirgendwo-xyz.de', 'Hallo'),
+    ]);
+    mockImapService.moveEmail.mockResolvedValueOnce({
+      destination: 'Dev', results: [{ uid: 1, destination: 'Dev' }],
+    });
+    mockImapService.addKeywordToUids.mockRejectedValueOnce(new Error('server refused keyword'));
+
+    const parsed = parse(await handlers.get('imap_sort_inbox')!(runBase));
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.movedCount).toBe(1);
+    expect(parsed.markedCount).toBe(0);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('cursor keyword'));
+    vi.restoreAllMocks();
+  });
+
+  it('keeps imap_categorize_emails read-only even with a cursor', async () => {
+    mockImapService.searchEmails.mockResolvedValueOnce([
+      email(1, 'a@nirgendwo-xyz.de', 'Hallo'),
+    ]);
+
+    await handlers.get('imap_categorize_emails')!({
+      accountId: 'acc1', folder: 'Unsortiert', limit: 100,
+      categories: undefined, minScore: undefined, useHeaders: false,
+      sampleLimit: 20, cursorKeyword: '$imapmcpChecked',
+    });
+
+    expect(mockImapService.searchEmails).toHaveBeenCalled();
+    expect(mockImapService.addKeywordToUids).not.toHaveBeenCalled();
+    expect(mockImapService.moveEmail).not.toHaveBeenCalled();
   });
 });

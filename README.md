@@ -757,6 +757,8 @@ configuration never takes the server down.
   - categories: Restrict to these category ids (optional)
   - minScore: Minimum score to assign a category (default: 6)
   - useHeaders: Fetch headers to detect mailing-list mail (default: true)
+  - cursorKeyword: Progress marker; selects messages without this keyword
+      instead of the newest ones (optional, read-only here)
   - sampleLimit: Examples per sample list, 1-200 (default: 20). Raise it when
       auditing the rule set — the uncategorized samples are what reveal
       missing domains and keywords.
@@ -785,6 +787,8 @@ configuration never takes the server down.
       e.g. "Archiv/" or "INBOX." (optional)
   - moveUncategorizedTo: Folder for messages that reach no category, as a full
       path — folderPrefix is not applied (optional; omit to leave them in place)
+  - cursorKeyword: Progress marker; selects unmarked messages and marks what
+      stays, so repeated calls work through the folder (optional)
   ```
 
   Preview first, then execute:
@@ -806,9 +810,45 @@ configuration never takes the server down.
   imap_sort_inbox { "folder": "Finanzen", "limit": 500, "moveUncategorizedTo": "INBOX", "dryRun": false }
   ```
 
-  Note that the scan always covers the *newest* `limit` messages of the folder,
-  so a folder with more than 500 messages needs repeated runs — each run moves
-  mail out and thereby uncovers older messages for the next one.
+  **Working a folder through to the end.** Both tools take the *newest* `limit`
+  messages by default. That is the right window for an inbox, but it cannot
+  drain a folder: messages the rules do not match stay put, fill the newest-N
+  window again on the next call, and the older ones are never reached.
+
+  Pass `cursorKeyword` to select "messages not carrying this keyword" instead.
+  `imap_sort_inbox` marks whatever stayed in the folder, so the next call gets
+  the next batch and the folder eventually reports `totalExamined: 0`:
+
+  ```
+  imap_sort_inbox { "folder": "Unsortiert", "limit": 500,
+                    "cursorKeyword": "$imapmcpChecked", "dryRun": false }
+  ```
+
+  ```
+  run 1: examined 500, moved 11, marked 489
+  run 2: examined 500, moved  4, marked 496
+  run 3: examined 131, moved  0, marked 131
+  run 4: examined   0   ← done
+  ```
+
+  Only messages that stay are marked; moved ones have left the folder, and a
+  *failed* move is deliberately left unmarked so a transient error does not
+  exclude a message forever. `imap_categorize_emails` reads the cursor to pick
+  its batch but never writes it, so it stays read-only.
+
+  A custom keyword is used rather than the `\Seen` flag on purpose: read state
+  is user-visible and means something else, and marking a folder unread to track
+  progress would both destroy genuine unread status and light up an unread badge
+  in every mail client. Keywords are the IMAP mechanism for application
+  bookkeeping and are invisible in most clients. Your server must accept them —
+  `imap_folder_status` shows `\*` in `permanentFlags` when it does.
+
+  After changing rules, clear the marker to re-examine everything:
+
+  ```
+  imap_search_emails  { "folder": "Unsortiert", "keywords": ["$imapmcpChecked"] }
+  imap_remove_keyword { "folder": "Unsortiert", "uid": [...], "keyword": "$imapmcpChecked" }
+  ```
 
 ## Security
 

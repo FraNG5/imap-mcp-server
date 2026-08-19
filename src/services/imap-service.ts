@@ -1004,6 +1004,47 @@ export class ImapService {
     }
   }
 
+  /**
+   * Add one keyword to many messages in a single command.
+   *
+   * Unlike {@link moveEmail}, this does not attribute failures per uid: setting
+   * a flag is idempotent and carries no per-message outcome worth reporting, so
+   * one round-trip for the whole set beats N round-trips for a better error
+   * message. Returns how many uids were addressed.
+   */
+  async addKeywordToUids(
+    accountId: string,
+    folderName: string,
+    uids: number[],
+    keyword: string,
+  ): Promise<number> {
+    if (isSystemFlag(keyword)) {
+      throw new Error(
+        `"${keyword}" is a system flag, not a custom keyword. Use the dedicated tool instead ` +
+        `(e.g. imap_flag_email for \Flagged, imap_mark_as_read for \Seen).`
+      );
+    }
+    if (uids.length === 0) return 0;
+
+    const client = await this.ensureConnected(accountId);
+
+    let lock;
+    try {
+      lock = await client.getMailboxLock(folderName);
+      const applied = await client.messageFlagsAdd(uids, [keyword], { uid: true });
+      if (!applied) {
+        throw new Error(
+          `Server did not apply keyword "${keyword}" to ${uids.length} message(s) in ${folderName}.`
+        );
+      }
+      return uids.length;
+    } finally {
+      if (lock) {
+        lock.release();
+      }
+    }
+  }
+
   async removeKeyword(accountId: string, folderName: string, uid: number, keyword: string): Promise<void> {
     if (isSystemFlag(keyword)) {
       throw new Error(

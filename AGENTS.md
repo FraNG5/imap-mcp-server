@@ -61,7 +61,13 @@ working in this repository.
   - `category-tools.ts` — list categories, classify a folder (read-only), and
     `imap_sort_inbox`, which files mail into per-category folders. The sort tool
     is `dryRun: true` by default and both tools share one classification helper,
-    so the preview can never disagree with the move it previews.
+    so the preview can never disagree with the move it previews. Both also take
+    a `cursorKeyword`: with it the batch is "messages without that keyword"
+    rather than the newest N, and the sort marks what stayed — which is what
+    lets a folder be worked through instead of re-showing its newest messages.
+    A custom keyword, never `\Seen`: read state is user-visible and means
+    something else. `imap_categorize_emails` reads the cursor but never writes
+    it, so it stays in `READ_ONLY_TOOLS`.
 - **Web setup wizard** — `src/web/server.ts` (Express) serves `public/` for
   account onboarding (`npm run setup` / `imap-setup`).
 - **Types** — `src/types/index.ts`.
@@ -81,7 +87,7 @@ npm run setup        # launch the web setup wizard
 ```
 
 Always run `npm run build` **and** `npm test` before committing changes that
-touch `src/`. Keep the suite green (currently 503 tests).
+touch `src/`. Keep the suite green (currently 510 tests).
 
 > Note: `npm run lint` (`tsc --noEmit`) is memory-hungry on this project — the
 > MCP SDK's `registerTool` generics are deep enough to surface a pre-existing

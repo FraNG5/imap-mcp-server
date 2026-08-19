@@ -26,9 +26,16 @@ export function categoryTools(
   categoryService: CategoryService
 ): void {
   /**
-   * Load the newest `limit` messages of a folder and classify them. Shared by
-   * both tools so the preview and the move always see the same verdicts —
-   * a preview that can disagree with the operation it previews is worthless.
+   * Load a batch of messages from a folder and classify them. Shared by both
+   * tools so the preview and the move always see the same verdicts — a preview
+   * that can disagree with the operation it previews is worthless.
+   *
+   * Without `cursorKeyword` this takes the newest `limit` messages. That is the
+   * right window for an inbox, but it cannot work through a folder: messages
+   * the rules do not match stay put, fill the newest-N window again on the next
+   * call, and the older ones are never reached. With a cursor keyword the batch
+   * is instead "messages not yet marked", which advances until the folder is
+   * exhausted.
    */
   async function classifyFolder(
     accountId: string,
@@ -37,11 +44,14 @@ export function categoryTools(
     useHeaders: boolean,
     categories: string[] | undefined,
     minScore: number | undefined,
+    cursorKeyword?: string,
   ): Promise<Classification[]> {
     // Newest-N via sequence range (not a full SEARCH over the mailbox): the
     // whole point of the #138 fix, and it keeps the scan cost bounded by
     // `limit` rather than by mailbox size.
-    const messages = await imapService.getLatestEmails(accountId, folder, limit);
+    const messages = cursorKeyword
+      ? (await imapService.searchEmails(accountId, folder, { unKeywords: [cursorKeyword] })).slice(0, limit)
+      : await imapService.getLatestEmails(accountId, folder, limit);
     if (messages.length === 0) return [];
 
     let headersByUid = new Map<number, Record<string, string>>();
@@ -77,6 +87,7 @@ export function categoryTools(
     ).optional().describe('Restrict to these category ids (e.g. ["finance","shipping"]). Use imap_list_categories to see the ids. Omit to score against all categories.'),
     minScore: z.coerce.number().optional().describe('Minimum score required to assign a category (default 6). A sender-domain or mailing-list-header hit scores 10, a sender mailbox name like "rechnung@" 5, each matching subject keyword 3 — so the default accepts a domain hit, a mailbox name plus a keyword, or two keywords, but not a single keyword. Raise it to classify only on strong signals.'),
     useHeaders: z.boolean().default(true).describe('Also fetch message headers (one extra batch round-trip) to detect mailing-list mail via List-Unsubscribe/List-Id. Strongly improves newsletter detection. Set false to skip it.'),
+    cursorKeyword: z.string().optional().describe('Custom IMAP keyword used as a progress marker, e.g. "$imapmcpChecked". When set, the batch is "messages that do not carry this keyword" instead of "the newest limit messages", so repeated calls work through a folder to the end instead of re-examining the same newest ones. Requires a server that accepts custom keywords (imap_folder_status shows "\*" in permanentFlags). Clear the marker with imap_remove_keyword to re-examine everything after a rule change.'),
   };
 
   // ---------------------------------------------------------------- read-only
@@ -122,10 +133,12 @@ export function categoryTools(
       ...sharedInputs,
       sampleLimit: z.coerce.number().min(1).max(MAX_SAMPLE_LIMIT).default(SAMPLE_LIMIT).describe(`How many example messages to include per sample list (1-${MAX_SAMPLE_LIMIT}, default ${SAMPLE_LIMIT}). Raise it when auditing the rule set: the uncategorized samples are what reveal missing domains and keywords, and the default truncates them.`),
     }
-  }, async ({ accountId: rawAccountId, accountName, folder, limit, categories, minScore, useHeaders, sampleLimit }) => {
+  }, async ({ accountId: rawAccountId, accountName, folder, limit, categories, minScore, useHeaders, sampleLimit, cursorKeyword }) => {
     try {
       const accountId = accountManager.resolveAccountId(rawAccountId, accountName);
-      const classifications = await classifyFolder(accountId, folder, limit, useHeaders, categories, minScore);
+      // Reads the cursor to pick the batch, never writes it: this tool is in the
+      // read-only tool set and must stay that way.
+      const classifications = await classifyFolder(accountId, folder, limit, useHeaders, categories, minScore, cursorKeyword);
 
       const summary = categoryService.summarize(classifications);
       const uncategorized = classifications.filter(c => !c.category);
@@ -188,7 +201,7 @@ export function categoryTools(
   // ----------------------------------------------------------------- mutating
 
   server.registerTool('imap_sort_inbox', {
-    description: 'File the newest messages of a folder into per-category folders (Finanzen, Shopping, Newsletter, …). Runs as a dry run by default: it reports exactly which messages would move where, and moves nothing until dryRun is set to false. Messages that do not reach the score threshold stay where they are, unless moveUncategorizedTo is set. Point folder at a category folder (not just INBOX) to re-sort mail that was filed wrongly. Preview with dryRun first, show the plan to the user, and only then repeat with dryRun:false.',
+    description: 'File the newest messages of a folder into per-category folders (Finanzen, Shopping, Newsletter, …). Runs as a dry run by default: it reports exactly which messages would move where, and moves nothing until dryRun is set to false. Messages that do not reach the score threshold stay where they are, unless moveUncategorizedTo is set. Point folder at a category folder (not just INBOX) to re-sort mail that was filed wrongly. To work a folder through to the end rather than re-examining its newest messages every time, pass cursorKeyword: messages that stay are marked with it and the next call skips them. Preview with dryRun first, show the plan to the user, and only then repeat with dryRun:false.',
     inputSchema: {
       ...accountSelector,
       ...sharedInputs,
@@ -197,10 +210,10 @@ export function categoryTools(
       folderPrefix: z.string().optional().describe('Prefix prepended to every category destination folder, including the hierarchy delimiter — e.g. "Archiv/" files into "Archiv/Shopping", "INBOX." into "INBOX.Shopping". Use imap_list_folders to check the delimiter your server uses. Does not apply to moveUncategorizedTo.'),
       moveUncategorizedTo: z.string().optional().describe('Folder for messages that reach no category (e.g. "INBOX"). Given as a full folder path — folderPrefix is not applied. Omit (the default) to leave unclassifiable mail untouched. Set it when cleaning up a category folder that was filed wrongly: mail that no longer belongs to any category goes back to the inbox instead of staying stuck.'),
     }
-  }, async ({ accountId: rawAccountId, accountName, folder, limit, categories, minScore, useHeaders, dryRun, createFolders, folderPrefix, moveUncategorizedTo }) => {
+  }, async ({ accountId: rawAccountId, accountName, folder, limit, categories, minScore, useHeaders, dryRun, createFolders, folderPrefix, moveUncategorizedTo, cursorKeyword }) => {
     try {
       const accountId = accountManager.resolveAccountId(rawAccountId, accountName);
-      const classifications = await classifyFolder(accountId, folder, limit, useHeaders, categories, minScore);
+      const classifications = await classifyFolder(accountId, folder, limit, useHeaders, categories, minScore, cursorKeyword);
 
       // Group by destination so each folder takes one batched move instead of
       // one round-trip per message.
@@ -323,6 +336,25 @@ export function categoryTools(
         }
       }
 
+      // Mark what stayed, so the next call gets the *next* batch instead of
+      // these again. Only messages still in the folder need the marker: moved
+      // ones are gone. Failed moves are deliberately left unmarked — a
+      // transient error must not exclude a message forever.
+      let markedCount = 0;
+      if (cursorKeyword) {
+        const stayed = [...stayingUncategorized, ...skippedSameFolder];
+        try {
+          markedCount = await imapService.addKeywordToUids(accountId, folder, stayed, cursorKeyword);
+        } catch (err) {
+          // The move already happened; a failed marker costs a repeated batch,
+          // not correctness, so report it rather than failing the whole call.
+          console.error(
+            `[imap-mcp] Could not set cursor keyword "${cursorKeyword}" in ${folder}: ` +
+            `${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+      }
+
       return {
         content: [{
           type: 'text',
@@ -334,6 +366,7 @@ export function categoryTools(
             movedCount: movedTotal,
             failedCount: failedTotal,
             stayedCount: stayingUncategorized.length + skippedSameFolder.length,
+            ...(cursorKeyword ? { cursorKeyword, markedCount } : {}),
             results,
             message: `Moved ${movedTotal}/${plannedCount} messages out of ${folder} into ${results.length} folder(s)`,
           }, null, 2)
