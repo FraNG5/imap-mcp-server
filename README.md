@@ -843,6 +843,15 @@ configuration never takes the server down.
   bookkeeping and are invisible in most clients. Your server must accept them —
   `imap_folder_status` shows `\*` in `permanentFlags` when it does.
 
+  On Windows PowerShell the keyword needs single quotes — unquoted, the
+  leading `$` is read as a variable and expands to nothing, which would
+  silently fall back to the newest-N window. An empty value is rejected so
+  that mistake fails loudly:
+
+  ```powershell
+  imap imap_sort_inbox folder=Unsortiert limit=500 'cursorKeyword=$imapmcpChecked'
+  ```
+
   After changing rules, clear the marker to re-examine everything:
 
   ```

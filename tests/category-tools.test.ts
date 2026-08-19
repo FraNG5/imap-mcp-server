@@ -520,3 +520,16 @@ describe('imap_sort_inbox — cursor keyword', () => {
     expect(mockImapService.moveEmail).not.toHaveBeenCalled();
   });
 });
+
+describe('cursorKeyword schema', () => {
+  it('rejects an empty keyword instead of silently taking the newest N', () => {
+    // PowerShell expands an unquoted "$imapmcpChecked" to nothing; without this
+    // the run would quietly use a different selection strategy.
+    const schema = (mockServer.registerTool as any).mock.calls
+      .find((c: any[]) => c[0] === 'imap_sort_inbox')[1].inputSchema.cursorKeyword;
+
+    expect(schema.safeParse('').success).toBe(false);
+    expect(schema.safeParse('$imapmcpChecked').success).toBe(true);
+    expect(schema.safeParse(undefined).success).toBe(true);
+  });
+});

@@ -87,7 +87,11 @@ export function categoryTools(
     ).optional().describe('Restrict to these category ids (e.g. ["finance","shipping"]). Use imap_list_categories to see the ids. Omit to score against all categories.'),
     minScore: z.coerce.number().optional().describe('Minimum score required to assign a category (default 6). A sender-domain or mailing-list-header hit scores 10, a sender mailbox name like "rechnung@" 5, each matching subject keyword 3 — so the default accepts a domain hit, a mailbox name plus a keyword, or two keywords, but not a single keyword. Raise it to classify only on strong signals.'),
     useHeaders: z.boolean().default(true).describe('Also fetch message headers (one extra batch round-trip) to detect mailing-list mail via List-Unsubscribe/List-Id. Strongly improves newsletter detection. Set false to skip it.'),
-    cursorKeyword: z.string().optional().describe('Custom IMAP keyword used as a progress marker, e.g. "$imapmcpChecked". When set, the batch is "messages that do not carry this keyword" instead of "the newest limit messages", so repeated calls work through a folder to the end instead of re-examining the same newest ones. Requires a server that accepts custom keywords (imap_folder_status shows "\*" in permanentFlags). Clear the marker with imap_remove_keyword to re-examine everything after a rule change.'),
+    // min(1): an empty value must fail rather than silently fall back to the
+    // newest-N window. A shell that expands "$imapmcpChecked" to nothing (as
+    // PowerShell does without single quotes) would otherwise change the
+    // selection strategy without saying so.
+    cursorKeyword: z.string().min(1).optional().describe('Custom IMAP keyword used as a progress marker, e.g. "$imapmcpChecked". When set, the batch is "messages that do not carry this keyword" instead of "the newest limit messages", so repeated calls work through a folder to the end instead of re-examining the same newest ones. Requires a server that accepts custom keywords (imap_folder_status shows "\*" in permanentFlags). Clear the marker with imap_remove_keyword to re-examine everything after a rule change. In PowerShell quote it in single quotes, otherwise the leading $ is read as a variable and expands to nothing.'),
   };
 
   // ---------------------------------------------------------------- read-only
