@@ -852,11 +852,19 @@ configuration never takes the server down.
   imap imap_sort_inbox folder=Unsortiert limit=500 'cursorKeyword=$imapmcpChecked'
   ```
 
-  After changing rules, clear the marker to re-examine everything:
+  After changing rules, clear the marker to re-examine everything. Search for
+  the marked messages, then hand their UIDs to `imap_remove_keyword` in one
+  call — both keyword tools take a list, so a folder-wide reset is a single
+  command rather than one per message:
 
   ```
-  imap_search_emails  { "folder": "Unsortiert", "keywords": ["$imapmcpChecked"] }
-  imap_remove_keyword { "folder": "Unsortiert", "uid": [...], "keyword": "$imapmcpChecked" }
+  imap_search_emails  { "folder": "Unsortiert", "keywords": ["$imapmcpChecked"],
+                        "limit": 2000 }
+  → { "messages": [ { "uid": 12, … }, { "uid": 15, … }, … ] }
+
+  imap_remove_keyword { "folder": "Unsortiert", "uid": [12, 15, …],
+                        "keyword": "$imapmcpChecked" }
+  → { "success": true, "count": 1214 }
   ```
 
 ## Security
