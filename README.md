@@ -863,19 +863,22 @@ configuration never takes the server down.
   imap imap_sort_inbox folder=Unsortiert limit=500 'cursorKeyword=$imapmcpChecked'
   ```
 
-  After changing rules, clear the marker to re-examine everything. Search for
-  the marked messages, then hand their UIDs to `imap_remove_keyword` in one
-  call — both keyword tools take a list, so a folder-wide reset is a single
-  command rather than one per message:
+  After changing rules, clear the marker to re-examine everything. The marker
+  belongs to the folder rather than to any UID you could be expected to name,
+  so `allInFolder` clears it in one call:
 
   ```
-  imap_search_emails  { "folder": "Unsortiert", "keywords": ["$imapmcpChecked"],
-                        "limit": 2000 }
-  → { "messages": [ { "uid": 12, … }, { "uid": 15, … }, … ] }
-
-  imap_remove_keyword { "folder": "Unsortiert", "uid": [12, 15, …],
+  imap_remove_keyword { "folder": "Unsortiert", "allInFolder": true,
                         "keyword": "$imapmcpChecked" }
-  → { "success": true, "count": 1214 }
+  → { "success": true, "count": 1072 }
+  ```
+
+  `uid` and `allInFolder` are mutually exclusive and one of them is required —
+  a forgotten `uid` can never sweep a folder by accident. Both keyword tools
+  also take a UID list, when you want to clear only some.
+
+  ```powershell
+  imap imap_remove_keyword folder=Unsortiert allInFolder=true 'keyword=$imapmcpChecked'
   ```
 
 ## Security
