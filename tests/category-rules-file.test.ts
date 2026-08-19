@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { loadCategoryRules, mergeRuleLayers, RuleLayer } from '../src/services/category-rules-file.js';
-import { readPreset, availablePresets, resolvePresetNames } from '../src/services/category-presets.js';
+import { readPreset, availablePresets, resolvePresetNames, presetsDir } from '../src/services/category-presets.js';
 import { CategoryService, CategoryRule } from '../src/services/category-service.js';
 
 const BASE: RuleLayer = [
@@ -252,5 +252,47 @@ describe('merged rule set integrity', () => {
         expect(weak.has(keyword), `${rule.id}: "${keyword}" is strong and weak`).toBe(false);
       }
     }
+  });
+});
+
+describe('IMAP_MCP_PRESETS_DIR', () => {
+  it('reads presets from the configured directory', () => {
+    const custom = mkdtempSync(path.join(tmpdir(), 'imap-mcp-presets-'));
+    writeFileSync(
+      path.join(custom, 'core.json'),
+      JSON.stringify({
+        name: 'core',
+        rules: [{
+          id: 'only', label: 'Only', folder: 'Only', priority: 1,
+          domains: ['example.test'], subjectKeywords: [],
+        }],
+      }),
+      'utf-8',
+    );
+
+    try {
+      expect(presetsDir({ IMAP_MCP_PRESETS_DIR: custom } as any)).toBe(path.resolve(custom));
+    } finally {
+      rmSync(custom, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves a relative path', () => {
+    const resolved = presetsDir({ IMAP_MCP_PRESETS_DIR: 'presets' } as any);
+    expect(path.isAbsolute(resolved)).toBe(true);
+    expect(resolved).toBe(path.resolve('presets'));
+  });
+
+  it('falls back to the bundled presets when the path does not exist', () => {
+    // A typo must not leave the server with no rules at all.
+    const resolved = presetsDir({ IMAP_MCP_PRESETS_DIR: path.join(dir, 'nope') } as any);
+
+    expect(resolved).not.toContain('nope');
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('does not exist'));
+    expect(readPreset('core').rules.length).toBeGreaterThan(0);
+  });
+
+  it('uses the bundled directory when unset', () => {
+    expect(presetsDir({} as any)).toBe(path.resolve('presets'));
   });
 });

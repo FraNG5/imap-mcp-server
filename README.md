@@ -695,6 +695,19 @@ A later layer **extends** an id it already knows: list fields merge, scalar
 fields replace. So a locale preset restates only what differs from `core`, and
 your file adds domains to `shopping` without repeating the category.
 
+The rules are read **once per server process, at startup** — there is no reload.
+A client that starts the server per call (a CLI wrapper) therefore picks up an
+edit immediately, while a long-running host such as a desktop app needs a
+restart.
+
+Presets are read from the directory next to the running server, so an installed
+copy serves its own files and an edit elsewhere has no effect. Set
+`IMAP_MCP_PRESETS_DIR` to read them from one place regardless of where the
+server runs — a path that does not exist is reported on stderr and the bundled
+presets are used, so a typo cannot leave the server without rules.
+(`~/.imap-mcp/categories.json` is unaffected: it is always read from the home
+directory.)
+
 Pick the locale with `IMAP_MCP_CATEGORY_PRESET`; several can be combined,
 comma-separated, applied left to right. Without it only `core` loads, which
 gives English folder names and the globally valid domains:
@@ -705,7 +718,10 @@ gives English folder names and the globally valid domains:
     "imap": {
       "command": "npx",
       "args": ["-y", "imap-mcp-server"],
-      "env": { "IMAP_MCP_CATEGORY_PRESET": "de-DE" }
+      "env": {
+        "IMAP_MCP_CATEGORY_PRESET": "de-DE",
+        "IMAP_MCP_PRESETS_DIR": "/path/to/your/presets"
+      }
     }
   }
 }

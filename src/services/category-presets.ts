@@ -20,10 +20,29 @@ import { CategoryRule } from './category-service.js';
  * `categories.json` anyway.
  */
 
-/** Directory holding the shipped presets, resolved relative to the built module. */
-export function presetsDir(): string {
-  // dist/index.js and src/services/*.ts sit at different depths, so walk up
-  // until the directory turns up rather than hard-coding a level count.
+/**
+ * Directory the presets are read from.
+ *
+ * `IMAP_MCP_PRESETS_DIR` wins when set, which is what lets presets be edited in
+ * one place while the server runs from another — without it, the directory is
+ * tied to the installation, and an installed copy silently keeps serving its own
+ * stale files. A path that does not exist is reported and ignored rather than
+ * leaving the server with no rules at all.
+ *
+ * Otherwise the shipped directory next to the running module, found by walking
+ * up: `dist/index.js` and `src/services/*.ts` sit at different depths, so a
+ * fixed level count would work for only one of them.
+ */
+export function presetsDir(env: NodeJS.ProcessEnv = process.env): string {
+  const configured = env.IMAP_MCP_PRESETS_DIR?.trim();
+  if (configured) {
+    const resolved = path.resolve(configured);
+    if (existsSync(resolved)) return resolved;
+    console.error(
+      `[imap-mcp] IMAP_MCP_PRESETS_DIR points at "${resolved}", which does not exist. Using the bundled presets.`
+    );
+  }
+
   let dir = path.dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 5; i++) {
     const candidate = path.join(dir, 'presets');
