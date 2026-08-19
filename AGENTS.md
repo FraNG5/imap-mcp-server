@@ -38,16 +38,25 @@ working in this repository.
     explicit (`priority`, then id) so the outcome never depends on rule order.
     Sender-domain parsing is shared with `SpamService` via
     `src/utils/email-address.ts` — keep it that way, two copies drift.
-    `DEFAULT_CATEGORY_RULES` stays limited to services any mailbox owner might
-    hear from. A rule set is a profile of its owner: a specific shop, club, or
-    hobby identifies a person, so those belong in the user's
-    `~/.imap-mcp/categories.json` (`category-rules-file.ts`), never in the
-    source — and the same applies to test fixtures.
+    The service holds **no rules at all**; `CategoryService` takes them as a
+    constructor argument. Rules live in `presets/*.json` and are layered by
+    `category-rules-file.ts`: `core` (ids, priorities, global domains, English
+    wording) → a locale preset such as `de-DE` (labels, folder names, keywords,
+    that country's domains) → the user's `~/.imap-mcp/categories.json`. A later
+    layer extends an id it already knows (lists union, scalars replace) or
+    defines a new one. Selection via `IMAP_MCP_CATEGORY_PRESET`, default `core`.
+    Keep `core` free of any one language or country — `tests/category-rules-
+    file.test.ts` fails on a `.de` domain or an umlaut in it. And a rule set is
+    a profile of its owner: a specific shop, club, or hobby identifies a person,
+    so those belong in the user's file, never in a shipped preset — the same
+    applies to test fixtures.
 - **Tools** (`src/tools/`), grouped by area:
   - `account-tools.ts` — add / update / list / remove / connect / disconnect / test.
   - `email-tools.ts` — search, get, latest, send, reply, forward, save draft,
     mark read/unread, delete, bulk delete, move, attachments, upload, threads.
-  - `folder-tools.ts` — list, status, create, unread counts.
+  - `folder-tools.ts` — list, status, create, rename, delete, unread counts.
+    Deleting a folder deletes its mail, so it is guarded: a non-empty or
+    special-use folder needs `force`, INBOX is refused outright.
   - `spam-tools.ts` — spam analysis, domain stats, allow/deny lists.
   - `category-tools.ts` — list categories, classify a folder (read-only), and
     `imap_sort_inbox`, which files mail into per-category folders. The sort tool
@@ -72,7 +81,7 @@ npm run setup        # launch the web setup wizard
 ```
 
 Always run `npm run build` **and** `npm test` before committing changes that
-touch `src/`. Keep the suite green (currently 464 tests).
+touch `src/`. Keep the suite green (currently 503 tests).
 
 > Note: `npm run lint` (`tsc --noEmit`) is memory-hungry on this project — the
 > MCP SDK's `registerTool` generics are deep enough to surface a pre-existing

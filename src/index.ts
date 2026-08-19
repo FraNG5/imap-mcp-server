@@ -30,7 +30,8 @@ const imapService = new ImapService();
 const accountManager = new AccountManager();
 const smtpService = new SmtpService();
 const spamService = new SpamService();
-// Built-in rules, extended by ~/.imap-mcp/categories.json when present.
+// Shipped presets (core + IMAP_MCP_CATEGORY_PRESET), extended by
+// ~/.imap-mcp/categories.json when present.
 const categoryService = new CategoryService(loadCategoryRules());
 
 // Allow ImapService to auto-connect using stored credentials

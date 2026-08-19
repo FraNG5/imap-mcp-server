@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import {
   CategoryService,
-  DEFAULT_CATEGORY_RULES,
   DOMAIN_WEIGHT,
   SUBJECT_KEYWORD_WEIGHT,
   STRONG_SUBJECT_KEYWORD_WEIGHT,
   LOCAL_PART_WEIGHT,
   CategoryRule,
 } from '../src/services/category-service.js';
+import { germanRules } from './preset-rules.js';
 
-const service = new CategoryService();
+const RULES = germanRules();
+const service = new CategoryService(RULES);
 
 const msg = (from: string, subject: string, headers?: Record<string, string>) =>
   ({ uid: 1, from, subject, headers });
@@ -161,6 +162,12 @@ describe('CategoryService — end-to-end classification per category', () => {
     ['tax portal', 'noreply@elster.de', 'Ihr Steuerbescheid liegt bereit', 'authorities'],
     ['ride-hailing receipt', 'noreply@uber.com', 'Ihre Fahrt am Dienstag', 'mobility'],
     ['car rental', 'service@sixt.de', 'Ihr Mietwagen steht bereit', 'mobility'],
+    ['vehicle service reminder', 'noreply@mail.bmw.de', 'Ihr Werkstatttermin', 'vehicle'],
+    ['grid operator', 'service@westnetz.de', 'Ihre Netzanschlussdaten', 'energy'],
+    ['insurance', 'service@huk24-service.de', 'Ihre Police', 'finance'],
+    ['gaming platform', 'noreply@e.battle.net', 'Neue Season startet', 'entertainment'],
+    ['account security subdomain', 'x@accountprotection.microsoft.com', 'Ungewoehnliche Anmeldung', 'security'],
+    ['carrier .com variant', 'noreply@dhl.com', 'Ihre Sendung', 'shipping'],
   ])('%s', (_name, from, subject, expected) => {
     expect(service.classify(msg(from, subject)).category?.id).toBe(expected);
   });
@@ -176,6 +183,13 @@ describe('CategoryService — end-to-end classification per category', () => {
     const result = service.classify(msg('shop@haendler-xyz.de', 'Seminar am 11.09.'));
     expect(result.category).toBeNull();
     expect(result.candidates.find(c => c.id === 'education')?.score).toBe(SUBJECT_KEYWORD_WEIGHT);
+  });
+
+  it('separates a rental from the car you own', () => {
+    // Both are transport, but a rental receipt and a recall notice belong in
+    // different places; the domain decides which.
+    expect(service.classify(msg('info@sixt.de', 'Ihre Buchung')).category?.id).toBe('mobility');
+    expect(service.classify(msg('info@bmw.de', 'Rückrufaktion')).category?.id).toBe('vehicle');
   });
 
   it('keeps a booked journey in travel rather than mobility', () => {
@@ -354,17 +368,17 @@ describe('CategoryService — batch helpers', () => {
 
 describe('CategoryService — rule set integrity', () => {
   it('has unique ids', () => {
-    const ids = DEFAULT_CATEGORY_RULES.map(r => r.id);
+    const ids = RULES.map(r => r.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('has unique destination folders', () => {
-    const folders = DEFAULT_CATEGORY_RULES.map(r => r.folder);
+    const folders = RULES.map(r => r.folder);
     expect(new Set(folders).size).toBe(folders.length);
   });
 
   it('gives every rule at least one signal', () => {
-    for (const rule of DEFAULT_CATEGORY_RULES) {
+    for (const rule of RULES) {
       const hasSignal =
         rule.domains.length > 0 || rule.subjectKeywords.length > 0 || rule.listHeaderSignal === true;
       expect(hasSignal, `rule ${rule.id} has no signal`).toBe(true);
@@ -372,7 +386,7 @@ describe('CategoryService — rule set integrity', () => {
   });
 
   it('keeps rule domains free of leading dots and whitespace', () => {
-    for (const rule of DEFAULT_CATEGORY_RULES) {
+    for (const rule of RULES) {
       for (const domain of rule.domains) {
         expect(domain, `rule ${rule.id}`).toBe(domain.trim().toLowerCase());
         expect(domain.startsWith('.'), `rule ${rule.id}: ${domain}`).toBe(false);
@@ -382,7 +396,7 @@ describe('CategoryService — rule set integrity', () => {
   });
 
   it('has unique priorities', () => {
-    const priorities = DEFAULT_CATEGORY_RULES.map(r => r.priority);
+    const priorities = RULES.map(r => r.priority);
     expect(new Set(priorities).size).toBe(priorities.length);
   });
 
@@ -390,7 +404,7 @@ describe('CategoryService — rule set integrity', () => {
     // Shared keywords are what produced arbitrary score ties in the ad-hoc
     // scripts ("rechnung" sat in three categories at once).
     const seen = new Map<string, string>();
-    for (const rule of DEFAULT_CATEGORY_RULES) {
+    for (const rule of RULES) {
       for (const keyword of [...rule.subjectKeywords, ...(rule.strongSubjectKeywords ?? [])]) {
         const previous = seen.get(keyword);
         expect(previous, `"${keyword}" is in both ${previous} and ${rule.id}`).toBeUndefined();
@@ -401,7 +415,7 @@ describe('CategoryService — rule set integrity', () => {
 
   it('never lists the same keyword as both strong and weak in one rule', () => {
     // It would score twice — 9 points from a single word.
-    for (const rule of DEFAULT_CATEGORY_RULES) {
+    for (const rule of RULES) {
       const weak = new Set(rule.subjectKeywords);
       for (const keyword of rule.strongSubjectKeywords ?? []) {
         expect(weak.has(keyword), `rule ${rule.id}: "${keyword}" is strong and weak`).toBe(false);
@@ -411,7 +425,7 @@ describe('CategoryService — rule set integrity', () => {
 
   it('does not reuse a sender keyword across rules', () => {
     const seen = new Map<string, string>();
-    for (const rule of DEFAULT_CATEGORY_RULES) {
+    for (const rule of RULES) {
       for (const keyword of rule.senderKeywords ?? []) {
         const previous = seen.get(keyword);
         expect(previous, `"${keyword}" is in both ${previous} and ${rule.id}`).toBeUndefined();
@@ -424,7 +438,7 @@ describe('CategoryService — rule set integrity', () => {
     // "info@", "noreply@" and friends appear across every category and would
     // hand out 5 points for no information at all.
     const generic = ['info', 'noreply', 'no-reply', 'mail', 'kontakt', 'service', 'support'];
-    for (const rule of DEFAULT_CATEGORY_RULES) {
+    for (const rule of RULES) {
       for (const keyword of rule.senderKeywords ?? []) {
         expect(generic, `rule ${rule.id}`).not.toContain(keyword);
       }

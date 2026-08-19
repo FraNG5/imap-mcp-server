@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { categoryTools } from '../src/tools/category-tools.js';
 import { CategoryService } from '../src/services/category-service.js';
+import { germanRules } from './preset-rules.js';
 
 const handlers = new Map<string, Function>();
 
@@ -41,7 +42,7 @@ describe('category tools', () => {
       mockServer as any,
       mockImapService as any,
       mockAccountManager as any,
-      new CategoryService(),
+      new CategoryService(germanRules()),
     );
   });
 

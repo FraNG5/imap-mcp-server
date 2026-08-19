@@ -12,6 +12,7 @@
   "files": [
     "dist",
     "public",
+    "presets",
     "README.md",
     "LICENSE"
   ],

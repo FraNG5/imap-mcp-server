@@ -642,7 +642,8 @@ per-category folders.
 Classification is **deterministic** — sender domain, sender mailbox name, subject
 keywords, and mailing-list headers, no model call and no network lookup — so the
 same mailbox always produces the same result, and a dry run is a trustworthy
-preview of what the move will do.
+preview of what the move will do. The rules themselves are data, not code: see
+"Where the rules come from" below.
 
 Scoring, against a default threshold of 6:
 
@@ -669,11 +670,49 @@ Every decision is reported with its reasons (`domain:amazon.de`,
 `subject!:rechnung` for a strong keyword, `sender:rechnung`, `subject:zahlung`,
 `header:list-unsubscribe`), so a dry run can be reviewed rather than trusted.
 
-**Your own categories.** The built-in rules cover services any mailbox owner
-might hear from. Everything past that — the shop you buy from, the club you
-support, the hobby you collect — is personal, and a rule set that encodes it is
-a profile of its owner. Put those in `~/.imap-mcp/categories.json`; they are
-merged at startup and never travel with the source:
+**Where the rules come from.** The classifier ships no rules of its own; they
+are layered from JSON at startup, so language, region and personal taste stay
+separable:
+
+| Layer | File | Holds |
+|---|---|---|
+| 1 | `presets/core.json` | Category ids, priorities, globally used sender domains (PayPal, GitHub, Netflix …), English labels, folder names and keywords |
+| 2 | `presets/<locale>.json` | One language and country: labels, folder names, subject keywords, that country's providers |
+| 3 | `~/.imap-mcp/categories.json` | Your own — the shop you buy from, the club you support, the hobby you collect |
+
+A later layer **extends** an id it already knows: list fields merge, scalar
+fields replace. So a locale preset restates only what differs from `core`, and
+your file adds domains to `shopping` without repeating the category.
+
+Pick the locale with `IMAP_MCP_CATEGORY_PRESET`; several can be combined,
+comma-separated, applied left to right. Without it only `core` loads, which
+gives English folder names and the globally valid domains:
+
+```json
+{
+  "mcpServers": {
+    "imap": {
+      "command": "npx",
+      "args": ["-y", "imap-mcp-server"],
+      "env": { "IMAP_MCP_CATEGORY_PRESET": "de-DE" }
+    }
+  }
+}
+```
+
+`imap_list_categories` shows the effective result after all layers.
+
+**Contributing a locale.** Copy `presets/de-DE.json`, translate the labels,
+folder names and keywords, and replace the domains with the providers of your
+country — banks, carriers, utilities, authorities. Only override what differs;
+everything else comes from `core`. Two rules the test suite enforces: `core`
+must stay free of any single language or country (no `.de` domains, no
+umlauts), and a locale preset may only extend categories `core` defines.
+
+**Your own categories.** Everything past a service anyone might use is personal,
+and a rule set that encodes it is a profile of its owner. Those belong in
+`~/.imap-mcp/categories.json`, which is merged last and never travels with the
+source:
 
 ```json
 {
@@ -684,22 +723,22 @@ merged at startup and never travel with the source:
     },
     {
       "id": "club",
-      "label": "⚽ Verein",
-      "folder": "Verein",
+      "label": "⚽ Club",
+      "folder": "Club",
       "priority": 47,
       "domains": ["my-club.de"],
-      "strongSubjectKeywords": ["mitgliedsbeitrag"],
-      "subjectKeywords": ["spieltag"]
+      "strongSubjectKeywords": ["membership fee"],
+      "subjectKeywords": ["matchday"]
     }
   ]
 }
 ```
 
-An entry whose `id` matches a built-in category **extends** it: list fields are
-merged, scalar fields replace. Any other `id` defines a new category and needs
-`label`, `folder`, `priority`, `domains` and `subjectKeywords`. A missing file
-is the normal case; a malformed one is reported on stderr and ignored, so a
-broken personal config never takes the server down.
+An entry whose `id` matches a known category extends it; any other `id` defines
+a new one and needs `label`, `folder`, `priority`, `domains` and
+`subjectKeywords`. A missing file is the normal case; a malformed one, or an
+unknown preset name, is reported on stderr and skipped, so a broken
+configuration never takes the server down.
 
 - **imap_list_categories**: List the built-in categories — id, label, destination
   folder, matched domains and subject keywords, plus the scoring model. Call this

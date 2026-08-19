@@ -1,12 +1,13 @@
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
-import { CategoryRule, DEFAULT_CATEGORY_RULES } from './category-service.js';
+import { CategoryRule } from './category-service.js';
+import { readPreset, resolvePresetNames } from './category-presets.js';
 
 /**
  * Optional user rule file, alongside the account store.
  *
- * The built-in rules describe services a mailbox owner anywhere is likely to
+ * The shipped presets describe services a mailbox owner anywhere is likely to
  * hear from. Anything past that — the shop you buy from, the club you support,
  * the hobby you collect — belongs to one person, and a rule set that encodes it
  * is a profile of its owner. Keeping those rules in a local file means a
@@ -15,16 +16,18 @@ import { CategoryRule, DEFAULT_CATEGORY_RULES } from './category-service.js';
 export const CATEGORY_RULES_PATH = path.join(os.homedir(), '.imap-mcp', 'categories.json');
 
 /**
- * Shape of `categories.json`: a list of rules. A rule whose `id` matches a
- * built-in one **extends** it — array fields are merged, scalars replace — so a
- * user can add domains to `shopping` without restating the category. Any other
- * `id` defines a new category and must be complete.
+ * One layer of rules: a preset file or the user's own. A rule whose `id` matches
+ * an earlier layer **extends** it — list fields merge, scalars replace — so a
+ * locale preset restates only what differs from `core`, and a user adds domains
+ * to `shopping` without repeating the category.
  */
+export type RuleLayer = Array<Partial<CategoryRule> & { id: string }>;
+
 export interface CategoryRulesFile {
-  rules: Array<Partial<CategoryRule> & { id: string }>;
+  rules: RuleLayer;
 }
 
-/** Merge one user entry into a built-in rule. Arrays union, scalars replace. */
+/** Merge one patch into a rule. Lists union, scalars replace. */
 function mergeRule(base: CategoryRule, patch: Partial<CategoryRule>): CategoryRule {
   const union = (a: string[] = [], b: string[] = []): string[] =>
     Array.from(new Set([...a, ...b]));
@@ -44,8 +47,9 @@ function mergeRule(base: CategoryRule, patch: Partial<CategoryRule>): CategoryRu
 }
 
 /**
- * A new category must bring everything the scorer needs. Reported rather than
- * thrown: one bad entry should cost that entry, not the whole rule set.
+ * A rule that no earlier layer defined must bring everything the scorer needs.
+ * Reported rather than thrown: one bad entry should cost that entry, not the
+ * whole rule set.
  */
 function isCompleteRule(entry: Partial<CategoryRule> & { id: string }): entry is CategoryRule {
   return (
@@ -58,20 +62,41 @@ function isCompleteRule(entry: Partial<CategoryRule> & { id: string }): entry is
 }
 
 /**
- * Build the effective rule set from the built-ins plus `categories.json`.
- *
- * A missing file is the normal case and yields the built-ins unchanged. A
- * malformed file is reported on stderr and likewise falls back, because a
- * broken personal config must not take the server down — stdout is the JSON-RPC
- * channel, so warnings go to stderr only.
+ * Fold layers into one rule set, in order — later layers extend or override
+ * earlier ones. `onSkip` reports entries that cannot be applied; callers decide
+ * whether that is a warning or an error.
  */
-export function loadCategoryRules(
-  filePath: string = CATEGORY_RULES_PATH,
-  baseRules: CategoryRule[] = DEFAULT_CATEGORY_RULES,
+export function mergeRuleLayers(
+  layers: RuleLayer[],
+  onSkip: (id: string, reason: string) => void = () => {},
 ): CategoryRule[] {
-  if (!existsSync(filePath)) {
-    return baseRules;
+  const byId = new Map<string, CategoryRule>();
+
+  for (const layer of layers) {
+    for (const entry of layer) {
+      if (!entry || typeof entry.id !== 'string') {
+        onSkip('(unnamed)', 'missing "id"');
+        continue;
+      }
+      const base = byId.get(entry.id);
+      if (base) {
+        byId.set(entry.id, mergeRule(base, entry));
+        continue;
+      }
+      if (!isCompleteRule(entry)) {
+        onSkip(entry.id, 'no earlier layer defines it, and it lacks label, folder, priority, domains or subjectKeywords');
+        continue;
+      }
+      byId.set(entry.id, entry);
+    }
   }
+
+  return Array.from(byId.values());
+}
+
+/** Read the user's `categories.json`, or `null` when it is absent or unusable. */
+function readUserRules(filePath: string): RuleLayer | null {
+  if (!existsSync(filePath)) return null;
 
   let parsed: CategoryRulesFile;
   try {
@@ -80,46 +105,57 @@ export function loadCategoryRules(
     console.error(
       `[imap-mcp] Ignoring ${filePath}: not valid JSON (${err instanceof Error ? err.message : 'parse error'}).`
     );
-    return baseRules;
+    return null;
   }
-
   if (!parsed || !Array.isArray(parsed.rules)) {
     console.error(`[imap-mcp] Ignoring ${filePath}: expected an object with a "rules" array.`);
-    return baseRules;
+    return null;
+  }
+  return parsed.rules;
+}
+
+export interface LoadOptions {
+  /** Preset names, innermost first. Defaults to `core` plus `IMAP_MCP_CATEGORY_PRESET`. */
+  presets?: string[];
+  /** User rule file. Defaults to `~/.imap-mcp/categories.json`. */
+  userFile?: string;
+}
+
+/**
+ * Build the effective rule set: shipped presets first, the user's file last.
+ *
+ * Nothing here throws. A missing user file is the normal case; a malformed one,
+ * or a preset that does not exist, is reported on stderr and skipped, because a
+ * broken configuration must not take the server down. stdout is the JSON-RPC
+ * channel, so warnings go to stderr only.
+ */
+export function loadCategoryRules(options: LoadOptions = {}): CategoryRule[] {
+  const presetNames = options.presets ?? resolvePresetNames();
+  const userFile = options.userFile ?? CATEGORY_RULES_PATH;
+
+  const layers: RuleLayer[] = [];
+  const loaded: string[] = [];
+
+  for (const name of presetNames) {
+    try {
+      layers.push(readPreset(name).rules);
+      loaded.push(name);
+    } catch (err) {
+      console.error(`[imap-mcp] ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
-  const byId = new Map(baseRules.map(rule => [rule.id, rule]));
-  let added = 0;
-  let extended = 0;
+  const userRules = readUserRules(userFile);
+  if (userRules) layers.push(userRules);
 
-  for (const entry of parsed.rules) {
-    if (!entry || typeof entry.id !== 'string') {
-      console.error(`[imap-mcp] Skipping a rule in ${filePath}: missing "id".`);
-      continue;
-    }
+  const rules = mergeRuleLayers(layers, (id, reason) =>
+    console.error(`[imap-mcp] Skipping category "${id}": ${reason}.`)
+  );
 
-    const base = byId.get(entry.id);
-    if (base) {
-      byId.set(entry.id, mergeRule(base, entry));
-      extended++;
-      continue;
-    }
+  console.error(
+    `[imap-mcp] Categories: ${rules.length} from preset(s) ${loaded.join(' + ') || 'none'}` +
+    (userRules ? ` plus ${userRules.length} entr${userRules.length === 1 ? 'y' : 'ies'} from ${userFile}` : '') + '.'
+  );
 
-    if (!isCompleteRule(entry)) {
-      console.error(
-        `[imap-mcp] Skipping new category "${entry.id}" in ${filePath}: needs label, folder, priority, domains and subjectKeywords.`
-      );
-      continue;
-    }
-    byId.set(entry.id, entry);
-    added++;
-  }
-
-  if (added > 0 || extended > 0) {
-    console.error(
-      `[imap-mcp] Loaded ${filePath}: ${extended} categor${extended === 1 ? 'y' : 'ies'} extended, ${added} added.`
-    );
-  }
-
-  return Array.from(byId.values());
+  return rules;
 }

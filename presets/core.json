@@ -1,0 +1,471 @@
+{
+  "name": "core",
+  "description": "Language- and region-neutral base: category ids, priorities, globally used sender domains and English wording. Layer a locale preset on top.",
+  "rules": [
+    {
+      "id": "security",
+      "label": "🔐 Account & Security",
+      "folder": "Security",
+      "priority": 95,
+      "domains": [
+        "accountprotection.microsoft.com"
+      ],
+      "strongSubjectKeywords": [
+        "security alert",
+        "verification code",
+        "privacy policy",
+        "terms of service"
+      ],
+      "subjectKeywords": [
+        "login",
+        "sign-in",
+        "password",
+        "two-factor"
+      ],
+      "senderKeywords": [
+        "accounts",
+        "security"
+      ]
+    },
+    {
+      "id": "payroll",
+      "label": "💶 Payroll",
+      "folder": "Payroll",
+      "priority": 92,
+      "domains": [],
+      "strongSubjectKeywords": [
+        "payslip",
+        "payroll"
+      ],
+      "subjectKeywords": []
+    },
+    {
+      "id": "finance",
+      "label": "💰 Finance",
+      "folder": "Finance",
+      "priority": 90,
+      "domains": [
+        "paypal.com",
+        "klarna.com",
+        "n26.com",
+        "visa.com",
+        "mastercard.com",
+        "americanexpress.com",
+        "revolut.com",
+        "wise.com",
+        "stripe.com"
+      ],
+      "strongSubjectKeywords": [
+        "invoice",
+        "bank statement",
+        "direct debit",
+        "payment reminder"
+      ],
+      "subjectKeywords": [
+        "payment",
+        "credit note"
+      ],
+      "senderKeywords": [
+        "invoice",
+        "billing",
+        "receipts",
+        "accounting"
+      ]
+    },
+    {
+      "id": "authorities",
+      "label": "🏛️ Government",
+      "folder": "Government",
+      "priority": 87,
+      "domains": [],
+      "strongSubjectKeywords": [
+        "tax assessment",
+        "tax return"
+      ],
+      "subjectKeywords": [
+        "tax office"
+      ]
+    },
+    {
+      "id": "health",
+      "label": "🏥 Health",
+      "folder": "Health",
+      "priority": 85,
+      "domains": [
+        "doctolib.com",
+        "shop-apotheke.com",
+        "betterdoc.org",
+        "start-ghs.com"
+      ],
+      "strongSubjectKeywords": [
+        "prescription",
+        "doctor appointment"
+      ],
+      "subjectKeywords": [
+        "medical report",
+        "health insurance"
+      ],
+      "senderKeywords": [
+        "pharmacy",
+        "clinic"
+      ]
+    },
+    {
+      "id": "dev",
+      "label": "💻 Dev/IT",
+      "folder": "Dev",
+      "priority": 80,
+      "domains": [
+        "github.com",
+        "gitlab.com",
+        "bitbucket.org",
+        "npmjs.com",
+        "docker.com",
+        "amazonaws.com",
+        "digitalocean.com",
+        "vercel.com",
+        "cloudflare.com",
+        "atlassian.com",
+        "atlassian.net",
+        "sentry.io",
+        "circleci.com",
+        "adobe.com",
+        "oracle-mail.com",
+        "tuya.com"
+      ],
+      "strongSubjectKeywords": [
+        "pull request",
+        "merge request",
+        "dependabot"
+      ],
+      "subjectKeywords": [
+        "deployment",
+        "build failed",
+        "security advisory",
+        "workflow run"
+      ]
+    },
+    {
+      "id": "telecom",
+      "label": "📞 Telecom",
+      "folder": "Telecom",
+      "priority": 75,
+      "domains": [
+        "ionos.com",
+        "all-inkl.com"
+      ],
+      "subjectKeywords": [
+        "sim card",
+        "contract renewal"
+      ]
+    },
+    {
+      "id": "work",
+      "label": "💼 Work",
+      "folder": "Work",
+      "priority": 70,
+      "domains": [
+        "linkedin.com",
+        "xing.com",
+        "indeed.com",
+        "glassdoor.com",
+        "kununu.com"
+      ],
+      "strongSubjectKeywords": [
+        "job application",
+        "job offer"
+      ],
+      "subjectKeywords": [
+        "interview",
+        "employment contract"
+      ],
+      "senderKeywords": [
+        "recruiting",
+        "careers"
+      ]
+    },
+    {
+      "id": "support",
+      "label": "🛠️ Support",
+      "folder": "Support",
+      "priority": 72,
+      "domains": [],
+      "strongSubjectKeywords": [
+        "ticket id",
+        "support request"
+      ],
+      "subjectKeywords": [
+        "service case"
+      ],
+      "senderKeywords": [
+        "helpdesk"
+      ]
+    },
+    {
+      "id": "energy",
+      "label": "⚡ Energy",
+      "folder": "Energy",
+      "priority": 68,
+      "domains": [
+        "enbw.com",
+        "rheinenergie.com",
+        "energiegut.com"
+      ],
+      "strongSubjectKeywords": [
+        "electricity bill",
+        "meter reading"
+      ],
+      "subjectKeywords": [
+        "energy tariff",
+        "charging session"
+      ]
+    },
+    {
+      "id": "housing",
+      "label": "🏠 Housing",
+      "folder": "Housing",
+      "priority": 65,
+      "domains": [],
+      "subjectKeywords": [
+        "rental agreement",
+        "viewing appointment"
+      ]
+    },
+    {
+      "id": "shipping",
+      "label": "📄 Shipping",
+      "folder": "Shipping",
+      "priority": 60,
+      "domains": [
+        "hermesworld.com",
+        "ups.com",
+        "fedex.com",
+        "gls-group.com",
+        "dhl.com"
+      ],
+      "strongSubjectKeywords": [
+        "shipment number",
+        "shipping confirmation"
+      ],
+      "subjectKeywords": [
+        "tracking",
+        "parcel",
+        "delivery"
+      ],
+      "senderKeywords": [
+        "shipping"
+      ]
+    },
+    {
+      "id": "travel",
+      "label": "✈️ Travel",
+      "folder": "Travel",
+      "priority": 55,
+      "domains": [
+        "booking.com",
+        "ryanair.com",
+        "lufthansa.com",
+        "eurowings.com",
+        "airbnb.com",
+        "hotels.com",
+        "getyourguide.com",
+        "milesandmore.com",
+        "tripadvisor.com",
+        "turkishairlines.com",
+        "straiv.io"
+      ],
+      "strongSubjectKeywords": [
+        "booking confirmation",
+        "flight ticket",
+        "itinerary"
+      ],
+      "subjectKeywords": [
+        "boarding",
+        "check-in",
+        "reservation"
+      ],
+      "senderKeywords": [
+        "booking",
+        "reservations"
+      ]
+    },
+    {
+      "id": "vehicle",
+      "label": "🚙 Vehicle",
+      "folder": "Vehicle",
+      "priority": 54,
+      "domains": [
+        "bmw.com",
+        "kia.com",
+        "tesla.com"
+      ],
+      "strongSubjectKeywords": [
+        "recall notice",
+        "service appointment"
+      ],
+      "subjectKeywords": [
+        "inspection",
+        "vehicle"
+      ]
+    },
+    {
+      "id": "mobility",
+      "label": "🚗 Mobility",
+      "folder": "Mobility",
+      "priority": 53,
+      "domains": [
+        "uber.com",
+        "freenow.com",
+        "share-now.com",
+        "miles-mobility.com"
+      ],
+      "strongSubjectKeywords": [
+        "trip receipt"
+      ],
+      "subjectKeywords": [
+        "rental car",
+        "ride"
+      ]
+    },
+    {
+      "id": "shopping",
+      "label": "🛒 Shopping",
+      "folder": "Shopping",
+      "priority": 50,
+      "domains": [
+        "amazon.com",
+        "ebay.com",
+        "ikea.com",
+        "nespresso.com",
+        "sageappliances.com",
+        "subway.com",
+        "samsung-mail.com",
+        "crowdfarming.com",
+        "markenmehrwert.com",
+        "digitalriver.com",
+        "shopifyemail.com"
+      ],
+      "strongSubjectKeywords": [
+        "order confirmation"
+      ],
+      "subjectKeywords": [
+        "shopping cart",
+        "return label"
+      ],
+      "senderKeywords": [
+        "orders",
+        "shop",
+        "store"
+      ]
+    },
+    {
+      "id": "education",
+      "label": "🎓 Education",
+      "folder": "Education",
+      "priority": 45,
+      "domains": [
+        "coursera.org",
+        "udemy.com",
+        "udemymail.com",
+        "edx.org",
+        "udacity.com",
+        "pluralsight.com"
+      ],
+      "subjectKeywords": [
+        "course",
+        "seminar",
+        "webinar",
+        "certificate"
+      ]
+    },
+    {
+      "id": "social",
+      "label": "📧 Social",
+      "folder": "Social",
+      "priority": 40,
+      "domains": [
+        "facebook.com",
+        "facebookmail.com",
+        "instagram.com",
+        "twitter.com",
+        "x.com",
+        "tiktok.com",
+        "snapchat.com",
+        "telegram.org",
+        "whatsapp.com",
+        "discord.com",
+        "reddit.com"
+      ],
+      "subjectKeywords": [
+        "friend request",
+        "tagged you",
+        "commented on"
+      ]
+    },
+    {
+      "id": "entertainment",
+      "label": "🎵 Entertainment",
+      "folder": "Entertainment",
+      "priority": 35,
+      "domains": [
+        "netflix.com",
+        "spotify.com",
+        "disneyplus.com",
+        "primevideo.com",
+        "twitch.tv",
+        "steampowered.com",
+        "blizzard.com",
+        "battle.net",
+        "pokeraid.me",
+        "amazonmusic.com",
+        "uci-kinowelt.info"
+      ],
+      "subjectKeywords": [
+        "watchlist",
+        "new episode",
+        "concert ticket"
+      ]
+    },
+    {
+      "id": "subscription",
+      "label": "🔁 Subscriptions",
+      "folder": "Subscriptions",
+      "priority": 33,
+      "domains": [
+        "nvidia.com",
+        "perplexity.ai",
+        "mistral.ai"
+      ],
+      "strongSubjectKeywords": [
+        "subscription"
+      ],
+      "subjectKeywords": [
+        "free trial",
+        "plan change"
+      ]
+    },
+    {
+      "id": "newsletter",
+      "label": "📰 Newsletter",
+      "folder": "Newsletter",
+      "priority": 10,
+      "domains": [
+        "componentsource.com",
+        "theinsidersnet.com"
+      ],
+      "listHeaderSignal": true,
+      "strongSubjectKeywords": [
+        "newsletter"
+      ],
+      "subjectKeywords": [
+        "sale",
+        "black friday",
+        "discount code"
+      ],
+      "senderKeywords": [
+        "newsletter",
+        "mailing"
+      ]
+    }
+  ]
+}

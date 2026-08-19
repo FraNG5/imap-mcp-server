@@ -4,6 +4,7 @@ import { AccountManager } from '../services/account-manager.js';
 import { SmtpService } from '../services/smtp-service.js';
 import { SpamService } from '../services/spam-service.js';
 import { CategoryService } from '../services/category-service.js';
+import { loadCategoryRules } from '../services/category-rules-file.js';
 import { accountTools } from './account-tools.js';
 import { emailTools } from './email-tools.js';
 import { folderTools } from './folder-tools.js';
@@ -134,10 +135,10 @@ export function registerTools(
   accountManager: AccountManager,
   smtpService: SmtpService,
   spamService: SpamService,
-  // Optional so existing 5-arg callers keep working. CategoryService is a pure,
-  // dependency-free classifier, so a default instance is always valid; the
-  // parameter exists so a caller can inject a custom rule set.
-  categoryService: CategoryService = new CategoryService()
+  // Optional so existing 5-arg callers keep working; without one, the shipped
+  // presets and the user's categories.json are loaded, which is what a caller
+  // that does not care about rule selection wants anyway.
+  categoryService: CategoryService = new CategoryService(loadCategoryRules())
 ): void {
   const enabled = resolveEnabledTools();
 

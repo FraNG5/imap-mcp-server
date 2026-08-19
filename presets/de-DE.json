@@ -1,0 +1,470 @@
+{
+  "name": "de-DE",
+  "description": "Deutsche Bezeichnungen, Ordnernamen, Stichwoerter und Absenderdomains aus dem deutschsprachigen Raum. Setzt core voraus.",
+  "rules": [
+    {
+      "id": "security",
+      "label": "🔐 Konto & Sicherheit",
+      "folder": "Sicherheit",
+      "strongSubjectKeywords": [
+        "sicherheitswarnung",
+        "sicherheitshinweis",
+        "verifizierungscode",
+        "bestätigungscode",
+        "datenschutzrichtlinie",
+        "nutzungsbedingungen"
+      ],
+      "subjectKeywords": [
+        "benutzerkonto",
+        "anmeldeversuch",
+        "passwort",
+        "zwei-faktor"
+      ]
+    },
+    {
+      "id": "payroll",
+      "label": "💶 Gehalt",
+      "folder": "Gehalt",
+      "domains": [
+        "datev.de"
+      ],
+      "strongSubjectKeywords": [
+        "gehaltsabrechnung",
+        "lohnabrechnung",
+        "entgeltabrechnung",
+        "lohnsteuerbescheinigung",
+        "verdienstabrechnung"
+      ],
+      "subjectKeywords": [
+        "arbeitnehmer online"
+      ]
+    },
+    {
+      "id": "finance",
+      "label": "💰 Finanzen",
+      "folder": "Finanzen",
+      "domains": [
+        "paypal.de",
+        "sparkasse.de",
+        "commerzbank.de",
+        "deutsche-bank.de",
+        "ing.de",
+        "dkb.de",
+        "comdirect.de",
+        "postbank.de",
+        "amex.de",
+        "barclays.de",
+        "targobank.de",
+        "santander.de",
+        "hypovereinsbank.de",
+        "consorsbank.de",
+        "banknorwegian.de",
+        "lbb.de",
+        "f-i.de",
+        "huk24-service.de",
+        "finanzguru.de",
+        "pairfinance.de"
+      ],
+      "domainPrefixes": [
+        "sparkasse-",
+        "volksbank-",
+        "raiffeisenbank-"
+      ],
+      "strongSubjectKeywords": [
+        "rechnung",
+        "kontoauszug",
+        "mahnung",
+        "lastschrift",
+        "zahlungserinnerung",
+        "überweisung"
+      ],
+      "subjectKeywords": [
+        "zahlung",
+        "abrechnung",
+        "gutschrift"
+      ],
+      "senderKeywords": [
+        "rechnung",
+        "buchhaltung"
+      ]
+    },
+    {
+      "id": "authorities",
+      "label": "🏛️ Behörden",
+      "folder": "Behörden",
+      "domains": [
+        "elster.de",
+        "itzbund.de",
+        "bundesregierung.de"
+      ],
+      "strongSubjectKeywords": [
+        "steuerbescheid",
+        "steuererklärung",
+        "elster"
+      ],
+      "subjectKeywords": [
+        "finanzamt",
+        "bescheid"
+      ]
+    },
+    {
+      "id": "health",
+      "label": "🏥 Gesundheit",
+      "folder": "Gesundheit",
+      "domains": [
+        "doctolib.de",
+        "jameda.de",
+        "aok.de",
+        "tk.de",
+        "barmer.de",
+        "dak.de",
+        "docmorris.de",
+        "medpex.de",
+        "fielmann.de",
+        "apollo.de",
+        "generali.de"
+      ],
+      "strongSubjectKeywords": [
+        "arzttermin",
+        "impftermin",
+        "rezept"
+      ],
+      "subjectKeywords": [
+        "verordnung",
+        "untersuchung",
+        "befund",
+        "krankenkasse",
+        "praxis"
+      ],
+      "senderKeywords": [
+        "apotheke",
+        "arztpraxis",
+        "zahnarzt",
+        "aerzte"
+      ]
+    },
+    {
+      "id": "dev",
+      "label": "💻 Dev/IT",
+      "folder": "Dev"
+    },
+    {
+      "id": "telecom",
+      "label": "📞 Kommunikation",
+      "folder": "Kommunikation",
+      "domains": [
+        "telekom.de",
+        "vodafone.de",
+        "o2online.de",
+        "congstar.de",
+        "1und1.de",
+        "ionos.de",
+        "kundenserver.de",
+        "strato.de",
+        "alditalk-kundenbetreuung.de"
+      ],
+      "subjectKeywords": [
+        "tarifwechsel",
+        "mobilfunkrechnung",
+        "sim-karte",
+        "vertragsverlängerung",
+        "anschluss"
+      ]
+    },
+    {
+      "id": "work",
+      "label": "💼 Beruf",
+      "folder": "Beruf",
+      "domains": [
+        "stepstone.de",
+        "monster.de"
+      ],
+      "strongSubjectKeywords": [
+        "bewerbung",
+        "stellenangebot"
+      ],
+      "subjectKeywords": [
+        "vorstellungsgespräch",
+        "arbeitsvertrag",
+        "jobangebot"
+      ],
+      "senderKeywords": [
+        "karriere",
+        "personalabteilung"
+      ]
+    },
+    {
+      "id": "support",
+      "label": "🛠️ Support",
+      "folder": "Support",
+      "strongSubjectKeywords": [
+        "ticketnummer",
+        "ticket-nr",
+        "supportanfrage"
+      ],
+      "subjectKeywords": [
+        "servicefall",
+        "störungsmeldung",
+        "reklamation"
+      ]
+    },
+    {
+      "id": "energy",
+      "label": "⚡ Energie",
+      "folder": "Energie",
+      "domains": [
+        "eon.de",
+        "vattenfall.de",
+        "yello.de",
+        "lichtblick.de",
+        "octopusenergy.de",
+        "ewe-go.de",
+        "westnetz.de",
+        "ablesen.de",
+        "zolar.de"
+      ],
+      "domainPrefixes": [
+        "stadtwerke-"
+      ],
+      "strongSubjectKeywords": [
+        "stromabrechnung",
+        "gasabrechnung",
+        "abschlagszahlung",
+        "zählerstand"
+      ],
+      "subjectKeywords": [
+        "stromtarif",
+        "ladevorgang",
+        "grundversorgung"
+      ]
+    },
+    {
+      "id": "housing",
+      "label": "🏠 Wohnen",
+      "folder": "Wohnen",
+      "domains": [
+        "immobilienscout24.de",
+        "immowelt.de",
+        "immonet.de"
+      ],
+      "subjectKeywords": [
+        "besichtigungstermin",
+        "mietvertrag",
+        "nebenkostenabrechnung",
+        "exposé",
+        "wohnungsangebot"
+      ]
+    },
+    {
+      "id": "shipping",
+      "label": "📄 Dokumente & Versand",
+      "folder": "Dokumente",
+      "domains": [
+        "dhl.de",
+        "deutschepost.de",
+        "myhermes.de",
+        "dpd.de"
+      ],
+      "strongSubjectKeywords": [
+        "sendungsverfolgung",
+        "sendungsnummer",
+        "versandbestätigung"
+      ],
+      "subjectKeywords": [
+        "zustellung",
+        "paket"
+      ],
+      "senderKeywords": [
+        "versand",
+        "sendungsstatus"
+      ]
+    },
+    {
+      "id": "travel",
+      "label": "✈️ Reisen",
+      "folder": "Reisen",
+      "domains": [
+        "check24.de",
+        "expedia.de",
+        "kayak.de",
+        "skyscanner.de",
+        "bahn.de",
+        "flixbus.de",
+        "trivago.de"
+      ],
+      "strongSubjectKeywords": [
+        "buchungsbestätigung",
+        "flugticket",
+        "reiseunterlagen"
+      ],
+      "subjectKeywords": [
+        "reservierung",
+        "hotelbuchung"
+      ],
+      "senderKeywords": [
+        "buchung",
+        "reisebuero",
+        "reiseagentur"
+      ]
+    },
+    {
+      "id": "vehicle",
+      "label": "🚙 Fahrzeug",
+      "folder": "Fahrzeug",
+      "domains": [
+        "bmw.de",
+        "mini.de",
+        "vw.de",
+        "audi.de",
+        "mercedes-benz.de",
+        "skoda-auto.de",
+        "seat.de",
+        "ford.de",
+        "opel.de",
+        "toyota.de",
+        "renault.de",
+        "hyundai.de",
+        "adac.de"
+      ],
+      "strongSubjectKeywords": [
+        "hauptuntersuchung",
+        "werkstatttermin",
+        "rückrufaktion"
+      ],
+      "subjectKeywords": [
+        "inspektion",
+        "kundendienst",
+        "fahrzeug"
+      ]
+    },
+    {
+      "id": "mobility",
+      "label": "🚗 Mobilität",
+      "folder": "Mobilität",
+      "domains": [
+        "sixt.de",
+        "europcar.de",
+        "hertz.de",
+        "flinkster.de",
+        "nextbike.de"
+      ],
+      "strongSubjectKeywords": [
+        "fahrtquittung"
+      ],
+      "subjectKeywords": [
+        "mietwagen",
+        "fahrt"
+      ]
+    },
+    {
+      "id": "shopping",
+      "label": "🛒 Shopping",
+      "folder": "Shopping",
+      "domains": [
+        "amazon.de",
+        "ebay.de",
+        "kleinanzeigen.de",
+        "zalando.de",
+        "otto.de",
+        "mediamarkt.de",
+        "saturn.de",
+        "lieferando.de",
+        "hellofresh.de",
+        "flaconi.de",
+        "douglas.de",
+        "dm.de",
+        "rossmann.de",
+        "thomann.de",
+        "audible.de",
+        "payback.de",
+        "ebay-kleinanzeigen.de"
+      ],
+      "strongSubjectKeywords": [
+        "bestellung",
+        "bestellbestätigung",
+        "auftragsbestätigung"
+      ],
+      "subjectKeywords": [
+        "warenkorb",
+        "retoure",
+        "lieferung"
+      ],
+      "senderKeywords": [
+        "bestellservice"
+      ]
+    },
+    {
+      "id": "education",
+      "label": "🎓 Bildung",
+      "folder": "Bildung",
+      "domains": [
+        "haufe-akademie.de"
+      ],
+      "subjectKeywords": [
+        "kursbeginn",
+        "schulung",
+        "zertifikat",
+        "prüfungstermin",
+        "lerneinheit"
+      ]
+    },
+    {
+      "id": "social",
+      "label": "📧 Soziales",
+      "folder": "Soziales",
+      "subjectKeywords": [
+        "freundschaftsanfrage",
+        "markierte dich",
+        "neue nachricht von",
+        "kommentierte"
+      ]
+    },
+    {
+      "id": "entertainment",
+      "label": "🎵 Unterhaltung",
+      "folder": "Unterhaltung",
+      "domains": [
+        "sky.de",
+        "wowtv.de",
+        "joyn.de",
+        "eventim.de",
+        "cinemaxx.de"
+      ],
+      "subjectKeywords": [
+        "konzertticket",
+        "neue folge",
+        "kinoprogramm"
+      ]
+    },
+    {
+      "id": "subscription",
+      "label": "🔁 Abo",
+      "folder": "Abo",
+      "domains": [
+        "chip-digital.de"
+      ],
+      "subjectKeywords": [
+        "abo",
+        "testphase",
+        "kündigungsbestätigung"
+      ]
+    },
+    {
+      "id": "newsletter",
+      "label": "📰 Newsletter",
+      "folder": "Newsletter",
+      "domains": [
+        "psd-tutorials.de",
+        "teltarif.de"
+      ],
+      "subjectKeywords": [
+        "rabattcode",
+        "gutscheincode",
+        "wochenangebot"
+      ],
+      "senderKeywords": [
+        "werbung"
+      ]
+    }
+  ]
+}
