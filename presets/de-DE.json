@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "de-DE",
   "description": "Deutsche Bezeichnungen, Ordnernamen, Stichwoerter und Absenderdomains aus dem deutschsprachigen Raum. Setzt core voraus.",
   "rules": [
@@ -63,7 +63,9 @@
         "f-i.de",
         "huk24-service.de",
         "finanzguru.de",
-        "pairfinance.de"
+        "pairfinance.de",
+        "service.easybank.de",
+        "easybank.de"
       ],
       "domainPrefixes": [
         "sparkasse-",
@@ -97,7 +99,9 @@
         "itzbund.de",
         "bundesregierung.de",
         "deutsche-rentenversicherung.de",
-        "duesseldorf.ihk.de"
+        "duesseldorf.ihk.de",
+        "bafa.bund.de",
+        "bmi.bund.de"
       ],
       "strongSubjectKeywords": [
         "steuerbescheid",
@@ -125,7 +129,9 @@
         "fielmann.de",
         "apollo.de",
         "generali.de",
-        "betterdoc.de"
+        "betterdoc.de",
+        "signal-iduna.de",
+        "central.de"
       ],
       "strongSubjectKeywords": [
         "arzttermin",
@@ -266,7 +272,10 @@
         "dhl.de",
         "deutschepost.de",
         "myhermes.de",
-        "dpd.de"
+        "dpd.de",
+        "gls-group.eu",
+        "shipup.co",
+        "sendcloud.com"
       ],
       "strongSubjectKeywords": [
         "sendungsverfolgung",
@@ -293,7 +302,9 @@
         "skyscanner.de",
         "bahn.de",
         "flixbus.de",
-        "trivago.de"
+        "trivago.de",
+        "iberostar.com",
+        "eurowings-holidays.com"
       ],
       "strongSubjectKeywords": [
         "buchungsbestätigung",
@@ -349,7 +360,8 @@
         "europcar.de",
         "hertz.de",
         "flinkster.de",
-        "nextbike.de"
+        "nextbike.de",
+        "europcar.com"
       ],
       "strongSubjectKeywords": [
         "fahrtquittung"
@@ -380,7 +392,14 @@
         "thomann.de",
         "audible.de",
         "payback.de",
-        "ebay-kleinanzeigen.de"
+        "ebay-kleinanzeigen.de",
+        "klantmail.snelstart.nl",
+        "tchibo.de",
+        "marc-o-polo.com",
+        "marc-o-polo.de",
+        "keencoffee.com",
+        "postery.com",
+        "picnic.de"
       ],
       "strongSubjectKeywords": [
         "bestellung",

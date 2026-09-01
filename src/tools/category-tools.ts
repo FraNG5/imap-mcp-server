@@ -18,6 +18,12 @@ const MAX_LIMIT = 500;
 const SAMPLE_LIMIT = 20;
 /** Ceiling for the caller-supplied sample limit. */
 const MAX_SAMPLE_LIMIT = 200;
+/**
+ * How many batches one untilDone call may run. A bound rather than a promise of
+ * completion: a single tool call should stay something a caller can wait for,
+ * and at the 500-message batch ceiling this still covers 25,000 messages.
+ */
+const MAX_BATCHES = 50;
 
 export function categoryTools(
   server: McpServer,
@@ -210,74 +216,165 @@ export function categoryTools(
   // ----------------------------------------------------------------- mutating
 
   server.registerTool('imap_sort_inbox', {
-    description: 'File the newest messages of a folder into per-category folders (Finanzen, Shopping, Newsletter, …). Runs as a dry run by default: it reports exactly which messages would move where, and moves nothing until dryRun is set to false. Messages that do not reach the score threshold stay where they are, unless moveUncategorizedTo is set. Point folder at a category folder (not just INBOX) to re-sort mail that was filed wrongly. To work a folder through to the end rather than re-examining its newest messages every time, pass cursorKeyword: messages that stay are marked with it and the next call skips them. Preview with dryRun first, show the plan to the user, and only then repeat with dryRun:false.',
+    description: 'File the newest messages of a folder into per-category folders (Finanzen, Shopping, Newsletter, …). Runs as a dry run by default: it reports exactly which messages would move where, and moves nothing until dryRun is set to false. Messages that do not reach the score threshold stay where they are, unless moveUncategorizedTo is set. Point folder at a category folder (not just INBOX) to re-sort mail that was filed wrongly. To work a folder through to the end rather than re-examining its newest messages every time, pass cursorKeyword: messages that stay are marked with it and the next call skips them — or add untilDone to have one call keep going until the folder is exhausted. Preview with dryRun first, show the plan to the user, and only then repeat with dryRun:false.',
     inputSchema: {
       ...accountSelector,
       ...sharedInputs,
       dryRun: z.boolean().default(true).describe('When true (the default) nothing is moved — the response only reports the planned moves. Set to false to actually move the messages. Always preview with the default first.'),
+      untilDone: z.boolean().default(false).describe(`Keep processing batches of "limit" messages until no unmarked message is left, instead of stopping after one. Requires cursorKeyword (without a progress marker the same messages would be examined forever) and dryRun:false (a dry run marks nothing, so it could never finish). Stops early after ${MAX_BATCHES} batches or when a batch makes no progress, and says so.`),
       createFolders: z.boolean().default(true).describe('Create a destination folder when it does not exist yet (default true). Set false to move only into folders that already exist and report the rest as errors.'),
       folderPrefix: z.string().optional().describe('Prefix prepended to every category destination folder, including the hierarchy delimiter — e.g. "Archiv/" files into "Archiv/Shopping", "INBOX." into "INBOX.Shopping". Use imap_list_folders to check the delimiter your server uses. Does not apply to moveUncategorizedTo.'),
       moveUncategorizedTo: z.string().optional().describe('Folder for messages that reach no category (e.g. "INBOX"). Given as a full folder path — folderPrefix is not applied. Omit (the default) to leave unclassifiable mail untouched. Set it when cleaning up a category folder that was filed wrongly: mail that no longer belongs to any category goes back to the inbox instead of staying stuck.'),
     }
-  }, async ({ accountId: rawAccountId, accountName, folder, limit, categories, minScore, useHeaders, dryRun, createFolders, folderPrefix, moveUncategorizedTo, cursorKeyword }) => {
+  }, async ({ accountId: rawAccountId, accountName, folder, limit, categories, minScore, useHeaders, dryRun, untilDone, createFolders, folderPrefix, moveUncategorizedTo, cursorKeyword }) => {
+    const fail = (error: string) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: false, folder, error }, null, 2) }],
+    });
+
     try {
       const accountId = accountManager.resolveAccountId(rawAccountId, accountName);
-      const classifications = await classifyFolder(accountId, folder, limit, useHeaders, categories, minScore, cursorKeyword);
 
-      // Group by destination so each folder takes one batched move instead of
-      // one round-trip per message.
-      const plan = new Map<string, { categoryId: string; label: string; uids: number[]; samples: Array<{ uid: number; from: string; subject: string; reasons: string[] }> }>();
-      const skippedSameFolder: number[] = [];
-      const stayingUncategorized: number[] = [];
-
-      for (const c of classifications) {
-        let target: string;
-        let categoryId: string;
-        let label: string;
-        let reasons: string[];
-
-        if (c.category) {
-          target = `${folderPrefix ?? ''}${c.category.folder}`;
-          categoryId = c.category.id;
-          label = c.category.label;
-          reasons = c.category.reasons;
-        } else if (moveUncategorizedTo) {
-          // Full path, deliberately unprefixed: the destination for
-          // unclassifiable mail is normally INBOX, which sits outside the
-          // category hierarchy a prefix describes.
-          target = moveUncategorizedTo;
-          categoryId = 'uncategorized';
-          label = '📁 Unsortiert';
-          // Name the near miss, so a reviewer of the dry run can tell
-          // "nothing matched" apart from "matched, but below the threshold".
-          reasons = c.candidates[0]
-            ? [`below-threshold:${c.candidates[0].id}(${c.candidates[0].score})`]
-            : ['no-rule-matched'];
-        } else {
-          stayingUncategorized.push(c.uid!);
-          continue;
-        }
-
-        // Never move a message onto its own folder: it is a no-op at best and a
-        // server error at worst, and it is the shape a bad prefix takes.
-        if (target.toLowerCase() === folder.toLowerCase()) {
-          skippedSameFolder.push(c.uid!);
-          continue;
-        }
-
-        if (!plan.has(target)) {
-          plan.set(target, { categoryId, label, uids: [], samples: [] });
-        }
-        const entry = plan.get(target)!;
-        entry.uids.push(c.uid!);
-        if (entry.samples.length < 5) {
-          entry.samples.push({ uid: c.uid!, from: c.from, subject: c.subject, reasons });
-        }
+      // Both guards protect against a loop that could never end: without a
+      // marker every batch would re-examine the same messages, and a dry run
+      // never sets one.
+      if (untilDone && !cursorKeyword) {
+        return fail('untilDone needs cursorKeyword: without a progress marker every batch would examine the same messages again.');
+      }
+      if (untilDone && dryRun) {
+        return fail('untilDone needs dryRun:false: a dry run marks nothing, so the loop could never reach the end of the folder. Preview one batch first, then repeat with dryRun:false and untilDone:true.');
       }
 
-      const plannedCount = Array.from(plan.values()).reduce((sum, e) => sum + e.uids.length, 0);
+      /** Classify one batch and group it by destination folder. */
+      async function planBatch() {
+        const classifications = await classifyFolder(accountId, folder, limit, useHeaders, categories, minScore, cursorKeyword);
+
+        // Group by destination so each folder takes one batched move instead of
+        // one round-trip per message.
+        const plan = new Map<string, { categoryId: string; label: string; uids: number[]; samples: Array<{ uid: number; from: string; subject: string; reasons: string[] }> }>();
+        const skippedSameFolder: number[] = [];
+        const stayingUncategorized: number[] = [];
+
+        for (const c of classifications) {
+          let target: string;
+          let categoryId: string;
+          let label: string;
+          let reasons: string[];
+
+          if (c.category) {
+            target = `${folderPrefix ?? ''}${c.category.folder}`;
+            categoryId = c.category.id;
+            label = c.category.label;
+            reasons = c.category.reasons;
+          } else if (moveUncategorizedTo) {
+            // Full path, deliberately unprefixed: the destination for
+            // unclassifiable mail is normally INBOX, which sits outside the
+            // category hierarchy a prefix describes.
+            target = moveUncategorizedTo;
+            categoryId = 'uncategorized';
+            label = '📁 Unsortiert';
+            // Name the near miss, so a reviewer of the dry run can tell
+            // "nothing matched" apart from "matched, but below the threshold".
+            reasons = c.candidates[0]
+              ? [`below-threshold:${c.candidates[0].id}(${c.candidates[0].score})`]
+              : ['no-rule-matched'];
+          } else {
+            stayingUncategorized.push(c.uid!);
+            continue;
+          }
+
+          // Never move a message onto its own folder: it is a no-op at best and
+          // a server error at worst, and it is the shape a bad prefix takes.
+          if (target.toLowerCase() === folder.toLowerCase()) {
+            skippedSameFolder.push(c.uid!);
+            continue;
+          }
+
+          if (!plan.has(target)) {
+            plan.set(target, { categoryId, label, uids: [], samples: [] });
+          }
+          const entry = plan.get(target)!;
+          entry.uids.push(c.uid!);
+          if (entry.samples.length < 5) {
+            entry.samples.push({ uid: c.uid!, from: c.from, subject: c.subject, reasons });
+          }
+        }
+
+        const plannedCount = Array.from(plan.values()).reduce((sum, e) => sum + e.uids.length, 0);
+        return { examined: classifications.length, plan, plannedCount, skippedSameFolder, stayingUncategorized };
+      }
+
+      type BatchResult = {
+        category: string; targetFolder: string; requested: number; moved: number;
+        failed: number; destinationCreated?: boolean; errors?: Array<{ uid: number; error: string }>;
+      };
+
+      /** Move one planned batch and mark what stayed behind. */
+      async function executeBatch(batch: Awaited<ReturnType<typeof planBatch>>) {
+        const results: BatchResult[] = [];
+        let movedTotal = 0;
+        let failedTotal = 0;
+
+        for (const [target, entry] of batch.plan) {
+          try {
+            const result = await imapService.moveEmail(accountId, folder, entry.uids, target, {
+              createDestinationIfMissing: createFolders,
+            }) as { destination: string; destinationCreated?: boolean; results: Array<{ uid: number; error?: string }> };
+
+            const failed = result.results.filter(r => r.error);
+            const moved = result.results.length - failed.length;
+            movedTotal += moved;
+            failedTotal += failed.length;
+
+            results.push({
+              category: entry.categoryId,
+              targetFolder: target,
+              requested: entry.uids.length,
+              moved,
+              failed: failed.length,
+              destinationCreated: result.destinationCreated,
+              ...(failed.length > 0 ? { errors: failed.map(f => ({ uid: f.uid, error: f.error! })) } : {}),
+            });
+          } catch (err) {
+            // One destination failing (missing folder, permissions) must not
+            // abort the categories that follow.
+            failedTotal += entry.uids.length;
+            results.push({
+              category: entry.categoryId,
+              targetFolder: target,
+              requested: entry.uids.length,
+              moved: 0,
+              failed: entry.uids.length,
+              errors: [{ uid: -1, error: err instanceof Error ? err.message : 'Unknown error' }],
+            });
+          }
+        }
+
+        // Mark what stayed, so the next batch gets the *next* messages instead
+        // of these again. Only messages still in the folder need the marker:
+        // moved ones are gone. Failed moves are deliberately left unmarked — a
+        // transient error must not exclude a message forever.
+        let markedCount = 0;
+        if (cursorKeyword) {
+          const stayed = [...batch.stayingUncategorized, ...batch.skippedSameFolder];
+          try {
+            markedCount = await imapService.addKeywordToUids(accountId, folder, stayed, cursorKeyword);
+          } catch (err) {
+            // The move already happened; a failed marker costs a repeated batch,
+            // not correctness, so report it rather than failing the whole call.
+            console.error(
+              `[imap-mcp] Could not set cursor keyword "${cursorKeyword}" in ${folder}: ` +
+              `${err instanceof Error ? err.message : String(err)}`
+            );
+          }
+        }
+
+        return { movedTotal, failedTotal, markedCount, results };
+      }
+
+      // ------------------------------------------------------------ dry run
 
       if (dryRun) {
+        const batch = await planBatch();
         return {
           content: [{
             type: 'text',
@@ -285,10 +382,10 @@ export function categoryTools(
               success: true,
               dryRun: true,
               folder,
-              totalExamined: classifications.length,
-              wouldMove: plannedCount,
-              wouldStay: stayingUncategorized.length + skippedSameFolder.length,
-              plan: Array.from(plan.entries()).map(([target, e]) => ({
+              totalExamined: batch.examined,
+              wouldMove: batch.plannedCount,
+              wouldStay: batch.stayingUncategorized.length + batch.skippedSameFolder.length,
+              plan: Array.from(batch.plan.entries()).map(([target, e]) => ({
                 category: e.categoryId,
                 label: e.label,
                 targetFolder: target,
@@ -296,74 +393,65 @@ export function categoryTools(
                 uids: e.uids,
                 samples: e.samples,
               })),
-              stayingUncategorized: stayingUncategorized.length,
-              skippedAlreadyInTargetFolder: skippedSameFolder.length,
-              message: `Dry run: would move ${plannedCount}/${classifications.length} messages out of ${folder}. Repeat with dryRun:false to execute.`,
+              stayingUncategorized: batch.stayingUncategorized.length,
+              skippedAlreadyInTargetFolder: batch.skippedSameFolder.length,
+              message: `Dry run: would move ${batch.plannedCount}/${batch.examined} messages out of ${folder}. Repeat with dryRun:false to execute.`,
             }, null, 2)
           }]
         };
       }
 
-      const results: Array<{ category: string; targetFolder: string; requested: number; moved: number; failed: number; destinationCreated?: boolean; errors?: Array<{ uid: number; error: string }> }> = [];
+      // ------------------------------------------------------------ execute
+
+      let batches = 0;
+      let examinedTotal = 0;
       let movedTotal = 0;
       let failedTotal = 0;
+      let markedTotal = 0;
+      let stayedTotal = 0;
+      let stoppedBecause: string | null = null;
+      const byTarget = new Map<string, BatchResult>();
 
-      for (const [target, entry] of plan) {
-        try {
-          const result = await imapService.moveEmail(accountId, folder, entry.uids, target, {
-            createDestinationIfMissing: createFolders,
-          }) as { destination: string; destinationCreated?: boolean; results: Array<{ uid: number; error?: string }> };
+      do {
+        const batch = await planBatch();
+        if (batch.examined === 0) break;
 
-          const failed = result.results.filter(r => r.error);
-          const moved = result.results.length - failed.length;
-          movedTotal += moved;
-          failedTotal += failed.length;
+        batches++;
+        examinedTotal += batch.examined;
+        stayedTotal += batch.stayingUncategorized.length + batch.skippedSameFolder.length;
 
-          results.push({
-            category: entry.categoryId,
-            targetFolder: target,
-            requested: entry.uids.length,
-            moved,
-            failed: failed.length,
-            destinationCreated: result.destinationCreated,
-            ...(failed.length > 0
-              ? { errors: failed.map(f => ({ uid: f.uid, error: f.error! })) }
-              : {}),
-          });
-        } catch (err) {
-          // One destination failing (missing folder, permissions) must not
-          // abort the categories that follow.
-          failedTotal += entry.uids.length;
-          results.push({
-            category: entry.categoryId,
-            targetFolder: target,
-            requested: entry.uids.length,
-            moved: 0,
-            failed: entry.uids.length,
-            errors: [{ uid: -1, error: err instanceof Error ? err.message : 'Unknown error' }],
-          });
+        const run = await executeBatch(batch);
+        movedTotal += run.movedTotal;
+        failedTotal += run.failedTotal;
+        markedTotal += run.markedCount;
+
+        for (const r of run.results) {
+          const acc = byTarget.get(r.targetFolder);
+          if (!acc) {
+            byTarget.set(r.targetFolder, { ...r });
+            continue;
+          }
+          acc.requested += r.requested;
+          acc.moved += r.moved;
+          acc.failed += r.failed;
+          acc.destinationCreated ||= r.destinationCreated;
+          if (r.errors) acc.errors = [...(acc.errors ?? []), ...r.errors];
         }
-      }
 
-      // Mark what stayed, so the next call gets the *next* batch instead of
-      // these again. Only messages still in the folder need the marker: moved
-      // ones are gone. Failed moves are deliberately left unmarked — a
-      // transient error must not exclude a message forever.
-      let markedCount = 0;
-      if (cursorKeyword) {
-        const stayed = [...stayingUncategorized, ...skippedSameFolder];
-        try {
-          markedCount = await imapService.addKeywordToUids(accountId, folder, stayed, cursorKeyword);
-        } catch (err) {
-          // The move already happened; a failed marker costs a repeated batch,
-          // not correctness, so report it rather than failing the whole call.
-          console.error(
-            `[imap-mcp] Could not set cursor keyword "${cursorKeyword}" in ${folder}: ` +
-            `${err instanceof Error ? err.message : String(err)}`
-          );
+        if (!untilDone) break;
+
+        // A batch that neither moved nor marked anything would repeat forever.
+        if (run.movedTotal === 0 && run.markedCount === 0) {
+          stoppedBecause = 'a batch made no progress (nothing moved, nothing marked) — the cursor cannot advance';
+          break;
         }
-      }
+        if (batches >= MAX_BATCHES) {
+          stoppedBecause = `the ${MAX_BATCHES}-batch ceiling for one call was reached; run it again to continue`;
+          break;
+        }
+      } while (untilDone);
 
+      const results = Array.from(byTarget.values());
       return {
         content: [{
           type: 'text',
@@ -371,13 +459,18 @@ export function categoryTools(
             success: failedTotal === 0,
             dryRun: false,
             folder,
-            totalExamined: classifications.length,
+            ...(untilDone ? { batches, complete: stoppedBecause === null } : {}),
+            totalExamined: examinedTotal,
             movedCount: movedTotal,
             failedCount: failedTotal,
-            stayedCount: stayingUncategorized.length + skippedSameFolder.length,
-            ...(cursorKeyword ? { cursorKeyword, markedCount } : {}),
+            stayedCount: stayedTotal,
+            ...(cursorKeyword ? { cursorKeyword, markedCount: markedTotal } : {}),
+            ...(stoppedBecause ? { stoppedBecause } : {}),
             results,
-            message: `Moved ${movedTotal}/${plannedCount} messages out of ${folder} into ${results.length} folder(s)`,
+            message: untilDone
+              ? `Examined ${examinedTotal} messages in ${batches} batch(es), moved ${movedTotal} out of ${folder} into ${results.length} folder(s)` +
+                (stoppedBecause ? ` — stopped early: ${stoppedBecause}` : ' — folder is done')
+              : `Moved ${movedTotal}/${examinedTotal} messages out of ${folder} into ${results.length} folder(s)`,
           }, null, 2)
         }]
       };

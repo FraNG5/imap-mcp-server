@@ -821,6 +821,8 @@ UTF-8 BOM (common on Windows) are read normally.
       e.g. "Archiv/" or "INBOX." (optional)
   - moveUncategorizedTo: Folder for messages that reach no category, as a full
       path — folderPrefix is not applied (optional; omit to leave them in place)
+  - untilDone: Keep processing batches until the folder is exhausted; needs
+      cursorKeyword and dryRun:false (default: false)
   - cursorKeyword: Progress marker; selects unmarked messages and marks what
       stays, so repeated calls work through the folder (optional)
   ```
@@ -864,6 +866,20 @@ UTF-8 BOM (common on Windows) are read normally.
   run 3: examined 131, moved  0, marked 131
   run 4: examined   0   ← done
   ```
+
+  `untilDone` does the repeating for you — one call keeps taking batches until
+  nothing unmarked is left:
+
+  ```
+  imap_sort_inbox { "folder": "Unsortiert", "limit": 500, "dryRun": false,
+                    "cursorKeyword": "$imapmcpChecked", "untilDone": true }
+  → { "batches": 2, "complete": true, "totalExamined": 895, "movedCount": 6 }
+  ```
+
+  It requires `cursorKeyword` and `dryRun: false`, and refuses without them:
+  each is what lets the loop end. It also stops on its own after 50 batches, or
+  as soon as a batch neither moves nor marks anything, and `stoppedBecause` says
+  which — `complete: false` then means there is more to do.
 
   Only messages that stay are marked; moved ones have left the folder, and a
   *failed* move is deliberately left unmarked so a transient error does not

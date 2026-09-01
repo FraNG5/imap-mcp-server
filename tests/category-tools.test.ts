@@ -533,3 +533,108 @@ describe('cursorKeyword schema', () => {
     expect(schema.safeParse(undefined).success).toBe(true);
   });
 });
+
+describe('imap_sort_inbox — untilDone', () => {
+  const base2 = {
+    accountId: 'acc1', folder: 'Unsortiert', limit: 2,
+    categories: undefined, minScore: undefined, useHeaders: false,
+    createFolders: true, folderPrefix: undefined, moveUncategorizedTo: undefined,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handlers.clear();
+    mockImapService.fetchHeadersForUids.mockResolvedValue(new Map());
+    mockImapService.addKeywordToUids.mockImplementation(async (_a: any, _f: any, uids: number[]) => uids.length);
+    categoryTools(
+      mockServer as any,
+      mockImapService as any,
+      mockAccountManager as any,
+      new CategoryService(germanRules()),
+    );
+  });
+
+  it('refuses untilDone without a cursor, which could never advance', async () => {
+    const parsed = parse(await handlers.get('imap_sort_inbox')!({
+      ...base2, dryRun: false, untilDone: true, cursorKeyword: undefined,
+    }));
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toContain('needs cursorKeyword');
+    expect(mockImapService.searchEmails).not.toHaveBeenCalled();
+  });
+
+  it('refuses untilDone on a dry run, which could never finish', async () => {
+    const parsed = parse(await handlers.get('imap_sort_inbox')!({
+      ...base2, dryRun: true, untilDone: true, cursorKeyword: '$c',
+    }));
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toContain('needs dryRun:false');
+  });
+
+  it('keeps going until the folder is exhausted', async () => {
+    // Three batches: two full, then empty.
+    mockImapService.searchEmails
+      .mockResolvedValueOnce([email(1, 'a@github.com', 'x'), email(2, 'b@nirgendwo-xyz.de', 'y')])
+      .mockResolvedValueOnce([email(3, 'c@amazon.de', 'Ihre Bestellung'), email(4, 'd@nirgendwo-xyz.de', 'z')])
+      .mockResolvedValueOnce([]);
+    mockImapService.moveEmail
+      .mockResolvedValueOnce({ destination: 'Dev', results: [{ uid: 1, destination: 'Dev' }] })
+      .mockResolvedValueOnce({ destination: 'Shopping', results: [{ uid: 3, destination: 'Shopping' }] });
+
+    const parsed = parse(await handlers.get('imap_sort_inbox')!({
+      ...base2, dryRun: false, untilDone: true, cursorKeyword: '$c',
+    }));
+
+    expect(parsed.batches).toBe(2);
+    expect(parsed.complete).toBe(true);
+    expect(parsed.totalExamined).toBe(4);
+    expect(parsed.movedCount).toBe(2);
+    expect(parsed.markedCount).toBe(2);
+    expect(parsed.results.map((r: any) => r.targetFolder).sort()).toEqual(['Dev', 'Shopping']);
+  });
+
+  it('merges the per-folder totals across batches', async () => {
+    mockImapService.searchEmails
+      .mockResolvedValueOnce([email(1, 'a@github.com', 'x')])
+      .mockResolvedValueOnce([email(2, 'b@gitlab.com', 'y')])
+      .mockResolvedValueOnce([]);
+    mockImapService.moveEmail
+      .mockResolvedValueOnce({ destination: 'Dev', results: [{ uid: 1, destination: 'Dev' }] })
+      .mockResolvedValueOnce({ destination: 'Dev', results: [{ uid: 2, destination: 'Dev' }] });
+
+    const parsed = parse(await handlers.get('imap_sort_inbox')!({
+      ...base2, dryRun: false, untilDone: true, cursorKeyword: '$c',
+    }));
+
+    expect(parsed.results).toHaveLength(1);
+    expect(parsed.results[0]).toMatchObject({ targetFolder: 'Dev', moved: 2, requested: 2 });
+  });
+
+  it('stops when a batch makes no progress instead of spinning', async () => {
+    // Nothing matches and nothing can be marked — the cursor cannot advance.
+    mockImapService.searchEmails.mockResolvedValue([email(1, 'a@nirgendwo-xyz.de', 'x')]);
+    mockImapService.addKeywordToUids.mockResolvedValue(0);
+
+    const parsed = parse(await handlers.get('imap_sort_inbox')!({
+      ...base2, dryRun: false, untilDone: true, cursorKeyword: '$c',
+    }));
+
+    expect(parsed.batches).toBe(1);
+    expect(parsed.complete).toBe(false);
+    expect(parsed.stoppedBecause).toContain('no progress');
+  });
+
+  it('runs a single batch when untilDone is off', async () => {
+    mockImapService.searchEmails.mockResolvedValue([email(1, 'a@github.com', 'x')]);
+    mockImapService.moveEmail.mockResolvedValue({ destination: 'Dev', results: [{ uid: 1, destination: 'Dev' }] });
+
+    const parsed = parse(await handlers.get('imap_sort_inbox')!({
+      ...base2, dryRun: false, untilDone: false, cursorKeyword: '$c',
+    }));
+
+    expect(mockImapService.searchEmails).toHaveBeenCalledTimes(1);
+    expect(parsed.batches).toBeUndefined();
+  });
+});
